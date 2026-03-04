@@ -182,13 +182,23 @@ function renderMenu() {
             html += `    <span class="weight-value">${targetWeight}kg</span> × <span class="reps-value">${ex.target_reps}回</span>`;
             html += `  </div>`;
             html += `  <div class="set-inputs">`;
-            html += `    <div>`;
-            html += `      <input type="number" id="w-${exIdx}-${s}" value="${targetWeight}" step="2.5" min="0" inputmode="decimal">`;
-            html += `      <div class="input-label text-center">kg</div>`;
+            // 重量ステッパー
+            html += `    <div class="stepper-group">`;
+            html += `      <div class="stepper-controls">`;
+            html += `        <button type="button" class="stepper-btn" onclick="adjustValue('w-${exIdx}-${s}', -2.5, 0)">−</button>`;
+            html += `        <input type="number" id="w-${exIdx}-${s}" class="stepper-value" value="${targetWeight}" step="2.5" min="0" inputmode="decimal">`;
+            html += `        <button type="button" class="stepper-btn" onclick="adjustValue('w-${exIdx}-${s}', 2.5, 0)">＋</button>`;
+            html += `      </div>`;
+            html += `      <div class="input-label">kg</div>`;
             html += `    </div>`;
-            html += `    <div>`;
-            html += `      <input type="number" id="r-${exIdx}-${s}" value="${ex.target_reps}" step="1" min="0" inputmode="numeric">`;
-            html += `      <div class="input-label text-center">回</div>`;
+            // 回数ステッパー
+            html += `    <div class="stepper-group">`;
+            html += `      <div class="stepper-controls">`;
+            html += `        <button type="button" class="stepper-btn" onclick="adjustValue('r-${exIdx}-${s}', -1, 0)">−</button>`;
+            html += `        <input type="number" id="r-${exIdx}-${s}" class="stepper-value" value="${ex.target_reps}" step="1" min="0" inputmode="numeric">`;
+            html += `        <button type="button" class="stepper-btn" onclick="adjustValue('r-${exIdx}-${s}', 1, 0)">＋</button>`;
+            html += `      </div>`;
+            html += `      <div class="input-label">回</div>`;
             html += `    </div>`;
             html += `  </div>`;
             html += `</div>`;
@@ -251,3 +261,20 @@ function saveWorkout() {
         advanceToNextDay(programId, weekNum, dayNum);
     }, 1200);
 }
+
+/**
+ * ステッパーの値を増減させる
+ * @param {string} inputId - 対象inputのID
+ * @param {number} delta - 増減量
+ * @param {number} min - 最小値
+ */
+function adjustValue(inputId, delta, min = 0) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    let val = parseFloat(input.value) || 0;
+    val += delta;
+    if (val < min) val = min;
+    // 浮動小数点誤差対策 (ex: 2.5の倍数など)
+    input.value = Math.round(val * 10) / 10;
+}
+
