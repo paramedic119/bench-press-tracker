@@ -26,19 +26,44 @@ function initSelectors() {
     // Week選択肢を更新
     updateWeekOptions();
 
-    // 保存されたWeek/Dayがあれば復元
-    const savedWeek = localStorage.getItem(`${LS_KEY_WEEK}_${savedProgram}`);
-    const savedDay = localStorage.getItem(`${LS_KEY_DAY}_${savedProgram}`);
-    if (savedWeek) weekSelect.value = savedWeek;
+    // 次に取り組むべき未完了のWeek/Dayを取得して自動設定
+    const nextDay = getNextDay(savedProgram);
+    let targetWeek, targetDay;
+
+    if (nextDay) {
+        targetWeek = nextDay.week;
+        targetDay = nextDay.day;
+    } else {
+        // 保存済みのWeek/Dayがあれば復元（全て完了した場合など）
+        targetWeek = localStorage.getItem(`${LS_KEY_WEEK}_${savedProgram}`);
+        targetDay = localStorage.getItem(`${LS_KEY_DAY}_${savedProgram}`);
+    }
+
+    if (targetWeek) weekSelect.value = targetWeek;
 
     // Day選択肢を更新
     updateDayOptions();
-    if (savedDay) daySelect.value = savedDay;
+    if (targetDay) daySelect.value = targetDay;
 
     programSelect.addEventListener('change', () => {
-        setSelectedProgramId(programSelect.value);
+        const newProgId = programSelect.value;
+        setSelectedProgramId(newProgId);
         updateWeekOptions();
-        updateDayOptions();
+
+        // プログラム変更時も自動で次の未完了Dayを選択
+        const nextDay = getNextDay(newProgId);
+        if (nextDay) {
+            weekSelect.value = nextDay.week;
+            updateDayOptions();
+            daySelect.value = nextDay.day;
+        } else {
+            const savedWeek = localStorage.getItem(`${LS_KEY_WEEK}_${newProgId}`);
+            if (savedWeek) weekSelect.value = savedWeek;
+            updateDayOptions();
+            const savedDay = localStorage.getItem(`${LS_KEY_DAY}_${newProgId}`);
+            if (savedDay) daySelect.value = savedDay;
+        }
+
         renderMenu();
     });
 
