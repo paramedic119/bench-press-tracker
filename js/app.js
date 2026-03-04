@@ -1,20 +1,84 @@
 /* ==================================================
    app.js — アプリ初期化・タブ制御・トースト
+   GAS PropertiesService 対応版
    ================================================== */
 
-// --- localStorageキー ---
+// --- localStorageキー（フォールバック用） ---
 const LS_KEY_MAX = 'bp_max_weight';
 const LS_KEY_HISTORY = 'bp_history';
 const LS_KEY_WEEK = 'bp_selected_week';
 const LS_KEY_DAY = 'bp_selected_day';
 const LS_KEY_PROGRAM = 'bp_selected_program';
 
+// --- GAS環境判定 ---
+const IS_GAS = (typeof google !== 'undefined' && typeof google.script !== 'undefined' && typeof google.script.run !== 'undefined');
+
+// --- インメモリキャッシュ（GAS環境で使用） ---
+/** @type {Object<string, string>} */
+let _dataCache = {};
+
+/**
+ * GAS環境かどうかを判定
+ * @returns {boolean}
+ */
+function isGasEnv() {
+    return IS_GAS;
+}
+
+// --- データの読み書き（GAS/localStorage 自動切り替え） ---
+
+/**
+ * キャッシュまたはlocalStorageから値を取得
+ * @param {string} key
+ * @returns {string|null}
+ */
+function _getData(key) {
+    if (isGasEnv()) {
+        const v = _dataCache[key];
+        return v !== undefined ? v : null;
+    }
+    return localStorage.getItem(key);
+}
+
+/**
+ * キャッシュまたはlocalStorageに値を保存し、GAS環境ならサーバーにも同期
+ * @param {string} key
+ * @param {string} value
+ */
+function _setData(key, value) {
+    if (isGasEnv()) {
+        _dataCache[key] = value;
+        _syncToServer();
+    } else {
+        localStorage.setItem(key, value);
+    }
+}
+
+/**
+ * インメモリキャッシュをサーバーへ非同期保存（デバウンス付き）
+ */
+let _syncTimer = null;
+function _syncToServer() {
+    if (!isGasEnv()) return;
+    if (_syncTimer) clearTimeout(_syncTimer);
+    _syncTimer = setTimeout(() => {
+        const jsonStr = JSON.stringify(_dataCache);
+        google.script.run
+            .withFailureHandler((err) => {
+                console.error('サーバー保存エラー:', err);
+            })
+            .saveAllData(jsonStr);
+    }, 500);
+}
+
+// --- 公開API（既存インターフェース維持） ---
+
 /**
  * MAX重量を取得（デフォルト100kg）
  * @returns {number}
  */
 function getMaxWeight() {
-    const stored = localStorage.getItem(LS_KEY_MAX);
+    const stored = _getData(LS_KEY_MAX);
     return stored ? parseFloat(stored) : 100;
 }
 
@@ -23,7 +87,7 @@ function getMaxWeight() {
  * @param {number} weight
  */
 function setMaxWeight(weight) {
-    localStorage.setItem(LS_KEY_MAX, String(weight));
+    _setData(LS_KEY_MAX, String(weight));
 }
 
 /**
@@ -31,7 +95,7 @@ function setMaxWeight(weight) {
  * @returns {Array<object>}
  */
 function getHistory() {
-    const stored = localStorage.getItem(LS_KEY_HISTORY);
+    const stored = _getData(LS_KEY_HISTORY);
     return stored ? JSON.parse(stored) : [];
 }
 
@@ -40,7 +104,7 @@ function getHistory() {
  * @param {Array<object>} history
  */
 function setHistory(history) {
-    localStorage.setItem(LS_KEY_HISTORY, JSON.stringify(history));
+    _setData(LS_KEY_HISTORY, JSON.stringify(history));
 }
 
 /**
@@ -48,7 +112,7 @@ function setHistory(history) {
  * @returns {string}
  */
 function getSelectedProgramId() {
-    const stored = localStorage.getItem(LS_KEY_PROGRAM);
+    const stored = _getData(LS_KEY_PROGRAM);
     return stored || PROGRAMS[0].id;
 }
 
@@ -57,7 +121,7 @@ function getSelectedProgramId() {
  * @param {string} id
  */
 function setSelectedProgramId(id) {
-    localStorage.setItem(LS_KEY_PROGRAM, id);
+    _setData(LS_KEY_PROGRAM, id);
 }
 
 /**
@@ -124,11 +188,38 @@ function initMaxWeightInput() {
     });
 }
 
-// --- アプリ起動 ---
-document.addEventListener('DOMContentLoaded', () => {
+/**
+ * アプリのUI初期化（データロード後に呼ばれる）
+ */
+function _initApp() {
     initTabs();
     initMaxWeightInput();
     initSelectors();
     renderMenu();
     renderHistory();
+}
+
+// --- アプリ起動 ---
+document.addEventListener('DOMContentLoaded', () => {
+    if (isGasEnv()) {
+        // GAS環境: サーバーからデータをロードしてからUI初期化
+        google.script.run
+            .withSuccessHandler((jsonStr) => {
+                try {
+                    _dataCache = JSON.parse(jsonStr || '{}');
+                } catch (e) {
+                    _dataCache = {};
+                }
+                _initApp();
+            })
+            .withFailureHandler((err) => {
+                console.error('サーバーデータ読み込みエラー:', err);
+                _dataCache = {};
+                _initApp();
+            })
+            .loadAllData();
+    } else {
+        // ローカル環境: 従来通りlocalStorageを使用
+        _initApp();
+    }
 });

@@ -58,6 +58,24 @@ const codeGs = `function doGet(e) {
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no');
 }
+
+/**
+ * サーバーサイドから全ユーザーデータを一括取得
+ * @returns {string} JSON文字列
+ */
+function loadAllData() {
+  var props = PropertiesService.getUserProperties();
+  return props.getProperty('bp_all_data') || '{}';
+}
+
+/**
+ * サーバーサイドへ全ユーザーデータを一括保存
+ * @param {string} jsonStr - JSON文字列
+ */
+function saveAllData(jsonStr) {
+  var props = PropertiesService.getUserProperties();
+  props.setProperty('bp_all_data', jsonStr);
+}
 `;
 fs.writeFileSync(path.join(distDir, 'Code.gs'), codeGs);
 console.log('Code.gs generated.');

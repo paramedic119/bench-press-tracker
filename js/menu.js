@@ -35,8 +35,8 @@ function initSelectors() {
         targetDay = nextDay.day;
     } else {
         // 保存済みのWeek/Dayがあれば復元（全て完了した場合など）
-        targetWeek = localStorage.getItem(`${LS_KEY_WEEK}_${savedProgram}`);
-        targetDay = localStorage.getItem(`${LS_KEY_DAY}_${savedProgram}`);
+        targetWeek = _getData(`${LS_KEY_WEEK}_${savedProgram}`);
+        targetDay = _getData(`${LS_KEY_DAY}_${savedProgram}`);
     }
 
     if (targetWeek) weekSelect.value = targetWeek;
@@ -57,10 +57,10 @@ function initSelectors() {
             updateDayOptions();
             daySelect.value = nextDay.day;
         } else {
-            const savedWeek = localStorage.getItem(`${LS_KEY_WEEK}_${newProgId}`);
+            const savedWeek = _getData(`${LS_KEY_WEEK}_${newProgId}`);
             if (savedWeek) weekSelect.value = savedWeek;
             updateDayOptions();
-            const savedDay = localStorage.getItem(`${LS_KEY_DAY}_${newProgId}`);
+            const savedDay = _getData(`${LS_KEY_DAY}_${newProgId}`);
             if (savedDay) daySelect.value = savedDay;
         }
 
@@ -69,14 +69,14 @@ function initSelectors() {
 
     weekSelect.addEventListener('change', () => {
         const progId = getSelectedProgramId();
-        localStorage.setItem(`${LS_KEY_WEEK}_${progId}`, weekSelect.value);
+        _setData(`${LS_KEY_WEEK}_${progId}`, weekSelect.value);
         updateDayOptions();
         renderMenu();
     });
 
     daySelect.addEventListener('change', () => {
         const progId = getSelectedProgramId();
-        localStorage.setItem(`${LS_KEY_DAY}_${progId}`, daySelect.value);
+        _setData(`${LS_KEY_DAY}_${progId}`, daySelect.value);
         renderMenu();
     });
 }

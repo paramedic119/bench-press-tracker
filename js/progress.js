@@ -90,10 +90,10 @@ function advanceToNextDay(programId, currentWeek, currentDay) {
     if (!weekSelect || !daySelect) return;
 
     weekSelect.value = next.week;
-    localStorage.setItem(`${LS_KEY_WEEK}_${programId}`, String(next.week));
+    _setData(`${LS_KEY_WEEK}_${programId}`, String(next.week));
     updateDayOptions();
     daySelect.value = next.day;
-    localStorage.setItem(`${LS_KEY_DAY}_${programId}`, String(next.day));
+    _setData(`${LS_KEY_DAY}_${programId}`, String(next.day));
     renderMenu();
 
     showToast(`➡️ Week${next.week} Day${next.day} に進みました`, 3000);
@@ -197,12 +197,12 @@ function navigateToDay(programId, weekNum, dayNum) {
     const daySelect = document.getElementById('day-select');
     if (weekSelect) {
         weekSelect.value = weekNum;
-        localStorage.setItem(`${LS_KEY_WEEK}_${programId}`, String(weekNum));
+        _setData(`${LS_KEY_WEEK}_${programId}`, String(weekNum));
     }
     updateDayOptions();
     if (daySelect) {
         daySelect.value = dayNum;
-        localStorage.setItem(`${LS_KEY_DAY}_${programId}`, String(dayNum));
+        _setData(`${LS_KEY_DAY}_${programId}`, String(dayNum));
     }
     renderMenu();
 
