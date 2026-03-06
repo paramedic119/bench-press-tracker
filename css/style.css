@@ -325,6 +325,29 @@ body {
   border-bottom: none;
 }
 
+.set-checkbox {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: -4px;
+}
+
+.set-check-input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent-gold);
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.rpe-target {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  margin-left: 2px;
+  font-weight: 600;
+  vertical-align: top;
+}
+
 .set-number {
   width: 28px;
   height: 28px;

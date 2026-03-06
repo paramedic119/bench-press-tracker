@@ -177,9 +177,15 @@ function renderMenu() {
         // セット行
         for (let s = 1; s <= ex.target_sets; s++) {
             html += `<div class="set-row">`;
+            html += `  <div class="set-checkbox">`;
+            html += `    <input type="checkbox" id="chk-${exIdx}-${s}" class="set-check-input" checked>`;
+            html += `  </div>`;
             html += `  <div class="set-number">${s}</div>`;
             html += `  <div class="set-target">`;
             html += `    <span class="weight-value">${targetWeight}kg</span> × <span class="reps-value">${ex.target_reps}回</span>`;
+            if (ex.rpe_target) {
+                html += ` <small class="rpe-target">@${ex.rpe_target}</small>`;
+            }
             html += `  </div>`;
             html += `  <div class="set-inputs">`;
             // 重量ステッパー
@@ -233,21 +239,35 @@ function saveWorkout() {
         exercises: []
     };
 
+    let hasAnyCheckedSets = false;
+
     dayData.exercises.forEach((ex, exIdx) => {
         const sets = [];
         for (let s = 1; s <= ex.target_sets; s++) {
+            const chkInput = document.getElementById(`chk-${exIdx}-${s}`);
+            if (chkInput && !chkInput.checked) {
+                continue; // チェックされていないセットはパス
+            }
             const wInput = document.getElementById(`w-${exIdx}-${s}`);
             const rInput = document.getElementById(`r-${exIdx}-${s}`);
             const weight = parseFloat(wInput?.value || '0');
             const reps = parseInt(rInput?.value || '0', 10);
             sets.push({ set: s, weight, reps });
+            hasAnyCheckedSets = true;
         }
-        record.exercises.push({
-            type: ex.type,
-            name: EXERCISE_NAMES[ex.type] || ex.type,
-            sets: sets
-        });
+        if (sets.length > 0) {
+            record.exercises.push({
+                type: ex.type,
+                name: EXERCISE_NAMES[ex.type] || ex.type,
+                sets: sets
+            });
+        }
     });
+
+    if (!hasAnyCheckedSets) {
+        showToast('保存するセットが選択されていません', 2500);
+        return;
+    }
 
     // 履歴に追加
     const history = getHistory();
