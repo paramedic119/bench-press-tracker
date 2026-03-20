@@ -167,8 +167,8 @@ function renderMenu() {
         html += `  <div>`;
         html += `    <div class="exercise-name">${name}</div>`;
         html += `    <div class="exercise-meta">${ex.percentage_of_max}% × ${ex.target_reps}回 × ${ex.target_sets}セット`;
-        if (ex.is_amrap) {
-            html += ` <span class="badge-amrap">AMRAP${ex.rpe_target ? ` RPE${ex.rpe_target}` : ''}</span>`;
+        if (ex.is_amrap || ex.rpe_target) {
+            html += ` <span class="badge-amrap">${ex.is_amrap ? 'AMRAP' : ''}${ex.rpe_target ? ` RPE${ex.rpe_target}` : ''}</span>`;
         }
         html += `</div>`;
         html += `  </div>`;
@@ -176,15 +176,15 @@ function renderMenu() {
 
         // セット行
         for (let s = 1; s <= ex.target_sets; s++) {
-            html += `<div class="set-row">`;
+            html += `<div class="set-row checked" id="row-${exIdx}-${s}">`;
             html += `  <div class="set-checkbox">`;
-            html += `    <input type="checkbox" id="chk-${exIdx}-${s}" class="set-check-input" checked>`;
+            html += `    <input type="checkbox" id="chk-${exIdx}-${s}" class="set-check-input" checked onchange="toggleSetRowStyle(${exIdx}, ${s})">`;
             html += `  </div>`;
             html += `  <div class="set-number">${s}</div>`;
             html += `  <div class="set-target">`;
             html += `    <span class="weight-value">${targetWeight}kg</span> × <span class="reps-value">${ex.target_reps}回</span>`;
             if (ex.rpe_target) {
-                html += ` <small class="rpe-target">@${ex.rpe_target}</small>`;
+                html += ` <small class="rpe-target">@RPE ${ex.rpe_target}</small>`;
             }
             html += `  </div>`;
             html += `  <div class="set-inputs">`;
@@ -298,3 +298,19 @@ function adjustValue(inputId, delta, min = 0) {
     input.value = Math.round(val * 10) / 10;
 }
 
+/**
+ * セット行のスタイルをチェック状態に合わせて更新
+ * @param {number} exIdx
+ * @param {number} setNum
+ */
+function toggleSetRowStyle(exIdx, setNum) {
+    const chk = document.getElementById(`chk-${exIdx}-${setNum}`);
+    const row = document.getElementById(`row-${exIdx}-${setNum}`);
+    if (chk && row) {
+        if (chk.checked) {
+            row.classList.add('checked');
+        } else {
+            row.classList.remove('checked');
+        }
+    }
+}
