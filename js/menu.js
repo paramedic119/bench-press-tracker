@@ -176,9 +176,9 @@ function renderMenu() {
 
         // セット行
         for (let s = 1; s <= ex.target_sets; s++) {
-            html += `<div class="set-row checked" id="row-${exIdx}-${s}">`;
+            html += `<div class="set-row" id="row-${exIdx}-${s}">`;
             html += `  <div class="set-checkbox">`;
-            html += `    <input type="checkbox" id="chk-${exIdx}-${s}" class="set-check-input" checked onchange="toggleSetRowStyle(${exIdx}, ${s})">`;
+            html += `    <input type="checkbox" id="chk-${exIdx}-${s}" class="set-check-input" onchange="toggleSetRowStyle(${exIdx}, ${s})">`;
             html += `  </div>`;
             html += `  <div class="set-number">${s}</div>`;
             html += `  <div class="set-target">`;
