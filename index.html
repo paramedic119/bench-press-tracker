@@ -117,6 +117,11 @@
           🗑️ 選択して削除
         </button>
       </div>
+      <div class="data-controls">
+        <button class="btn-secondary" onclick="exportData()">📥 エクスポート</button>
+        <button class="btn-secondary" onclick="document.getElementById('import-file').click()">📤 インポート</button>
+        <input type="file" id="import-file" accept=".json,application/json" style="display:none" onchange="importData(event)">
+      </div>
       <div id="history-list">
         <!-- JSで動的に生成 -->
       </div>
@@ -125,6 +130,12 @@
     <!-- タブコンテンツ: グラフ -->
     <section id="tab-chart" class="tab-content">
       <div class="section-title">Progress Analysis</div>
+
+      <div class="period-filter">
+        <button class="period-btn" data-period="1m" onclick="setChartPeriod('1m')">1ヶ月</button>
+        <button class="period-btn" data-period="3m" onclick="setChartPeriod('3m')">3ヶ月</button>
+        <button class="period-btn active" data-period="all" onclick="setChartPeriod('all')">全期間</button>
+      </div>
 
       <div id="chart-empty" class="empty-state">
         <div class="icon">📈</div>
@@ -136,7 +147,7 @@
 
       <div id="chart-section" style="display: none;">
         <div class="chart-section">
-          <h3>🏆 推定1RM 推移</h3>
+          <h3>🏆 推定1RM 推移 <small class="chart-hint">⭐ = 自己ベスト更新</small></h3>
           <div class="chart-container">
             <canvas id="maxWeightChart"></canvas>
           </div>

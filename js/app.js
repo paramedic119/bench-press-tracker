@@ -332,6 +332,91 @@ function applyMaxSuggestion(newMax) {
     showToast(`💪 MAX重量を ${newMax}kg に更新しました`);
 }
 
+// ==================================================
+// データエクスポート / インポート（JSON）
+// GAS 同期失敗時の保険・機種変更時の引っ越し用
+// ==================================================
+
+const EXPORT_VERSION = 1;
+
+/**
+ * 現在の MAX・履歴・選択中プログラムを JSON でダウンロード
+ */
+function exportData() {
+    const payload = {
+        version: EXPORT_VERSION,
+        exportedAt: new Date().toISOString(),
+        maxWeight: getMaxWeight(),
+        selectedProgram: getSelectedProgramId(),
+        history: getHistory()
+    };
+    const json = JSON.stringify(payload, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const dateStr = new Date().toISOString().split('T')[0];
+    a.href = url;
+    a.download = `bp-tracker-backup-${dateStr}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('📥 バックアップを書き出しました');
+}
+
+/**
+ * <input type="file"> の change イベントから JSON を読み込み、確認の上でデータ全置換
+ * @param {Event} event
+ */
+function importData(event) {
+    const file = event.target?.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const data = JSON.parse(e.target.result);
+            if (!data || !Array.isArray(data.history)) {
+                throw new Error('history 配列が見つかりません');
+            }
+            const count = data.history.length;
+            if (!confirm(`${count}件の履歴をインポートします。\n既存のデータは置き換えられます。続けますか？`)) {
+                event.target.value = '';
+                return;
+            }
+
+            if (typeof data.maxWeight === 'number' && data.maxWeight > 0) {
+                setMaxWeight(data.maxWeight);
+            }
+            if (typeof data.selectedProgram === 'string') {
+                setSelectedProgramId(data.selectedProgram);
+            }
+            setHistory(data.history);
+
+            // UI 全体を再構築
+            const maxInput = document.getElementById('max-weight-input');
+            if (maxInput) maxInput.value = getMaxWeight();
+            const progSel = document.getElementById('program-select');
+            if (progSel) progSel.value = getSelectedProgramId();
+            updateWeekOptions();
+            updateDayOptions();
+            renderMenu();
+            renderHistory();
+            checkMaxSuggestion();
+            showToast(`✅ ${count}件をインポートしました`, 3000);
+        } catch (err) {
+            console.error('インポートエラー:', err);
+            showToast(`❌ ファイル形式が無効です: ${err.message}`, 4000);
+        } finally {
+            event.target.value = '';
+        }
+    };
+    reader.onerror = () => {
+        showToast('❌ ファイルの読込に失敗しました', 3000);
+        event.target.value = '';
+    };
+    reader.readAsText(file);
+}
+
 /**
  * アプリのUI初期化（データロード後に呼ばれる）
  */

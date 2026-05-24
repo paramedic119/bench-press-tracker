@@ -5,11 +5,40 @@
 let maxWeightChart = null;
 let volumeChart = null;
 
+// 期間フィルタの状態: '1m' | '3m' | 'all'
+let _chartPeriod = 'all';
+
+/**
+ * 期間フィルタを変更してグラフを再描画
+ * @param {'1m'|'3m'|'all'} period
+ */
+function setChartPeriod(period) {
+    _chartPeriod = period;
+    document.querySelectorAll('.period-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.period === period);
+    });
+    renderCharts();
+}
+
+/**
+ * 期間フィルタに従って履歴を絞り込む
+ * @param {Array<object>} history
+ * @returns {Array<object>}
+ */
+function _filterHistoryByPeriod(history) {
+    if (_chartPeriod === 'all') return history;
+    const now = Date.now();
+    const days = _chartPeriod === '1m' ? 30 : 90;
+    const threshold = now - days * 24 * 60 * 60 * 1000;
+    return history.filter(rec => new Date(rec.date).getTime() >= threshold);
+}
+
 /**
  * グラフを描画・更新
  */
 function renderCharts() {
-    const history = getHistory().reverse(); // 時系列にするため反転
+    const allHistory = getHistory().reverse(); // 時系列にするため反転
+    const history = _filterHistoryByPeriod(allHistory);
     const chartSection = document.getElementById('chart-section');
     const emptyState = document.getElementById('chart-empty');
 
@@ -37,6 +66,27 @@ function renderCharts() {
         return sessionBestMax;
     });
 
+    // PR (自己ベスト更新) 判定: 全期間で過去最大を超えた点を強調
+    // _filterHistoryByPeriod の結果ではなく allHistory に対して計算し、
+    // 期間外の PR が「フィルタを変えると突然 PR になる」のを防ぐ
+    const allEstimatedMaxes = allHistory.map(rec => {
+        let m = 0;
+        rec.exercises.forEach(ex => ex.sets.forEach(s => {
+            const est = estimateMax(s.weight, s.reps);
+            if (est > m) m = est;
+        }));
+        return { date: rec.date, max: m };
+    });
+    const prDates = new Set();
+    let runningMax = 0;
+    allEstimatedMaxes.forEach(({ date, max }) => {
+        if (max > runningMax) {
+            runningMax = max;
+            prDates.add(date);
+        }
+    });
+    const prFlags = history.map(rec => prDates.has(rec.date));
+
     // トレーニングボリューム推移
     const volumeData = history.map(rec => {
         let total = 0;
@@ -62,8 +112,12 @@ function renderCharts() {
                     borderColor: '#f0c040',
                     backgroundColor: 'rgba(240, 192, 64, 0.1)',
                     borderWidth: 3,
-                    pointBackgroundColor: '#f0c040',
-                    pointRadius: 4,
+                    pointBackgroundColor: prFlags.map(isPR => isPR ? '#fffacd' : '#f0c040'),
+                    pointBorderColor: prFlags.map(isPR => isPR ? '#ffc627' : '#f0c040'),
+                    pointBorderWidth: prFlags.map(isPR => isPR ? 2 : 1),
+                    pointRadius: prFlags.map(isPR => isPR ? 7 : 4),
+                    pointHoverRadius: prFlags.map(isPR => isPR ? 9 : 6),
+                    pointStyle: prFlags.map(isPR => isPR ? 'star' : 'circle'),
                     tension: 0.3,
                     fill: true
                 }]

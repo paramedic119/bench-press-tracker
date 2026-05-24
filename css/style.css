@@ -710,6 +710,20 @@ body {
   margin-bottom: 12px;
 }
 
+/* --- データ管理（エクスポート/インポート） --- */
+.data-controls {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.data-controls .btn-secondary {
+  flex: 1;
+  justify-content: center;
+  padding: 10px;
+  font-size: 0.78rem;
+}
+
 .history-item {
   display: flex;
   align-items: center;
@@ -791,6 +805,49 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
+  flex-wrap: wrap;
+}
+
+.chart-hint {
+  font-size: 0.65rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
+/* --- 期間フィルタ（セグメントコントロール） --- */
+.period-filter {
+  display: flex;
+  gap: 4px;
+  background: var(--bg-secondary);
+  padding: 4px;
+  border-radius: var(--radius-md);
+  margin-bottom: 16px;
+  border: 1px solid var(--border-color);
+}
+
+.period-btn {
+  flex: 1;
+  padding: 8px 6px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-normal);
+}
+
+.period-btn:hover {
+  color: var(--text-secondary);
+}
+
+.period-btn.active {
+  background: var(--gradient-blue);
+  color: #fff;
+  box-shadow: 0 0 12px var(--accent-blue-glow);
 }
 
 .chart-container {
