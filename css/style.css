@@ -154,15 +154,12 @@ body {
 
 /* --- タブナビゲーション --- */
 .tab-nav {
-  position: sticky;
-  top: 0;
-  z-index: 90;
   display: flex;
   gap: 4px;
   background: var(--bg-secondary);
   padding: 4px;
   border-radius: var(--radius-lg);
-  margin: 16px 0;
+  margin: 12px 0 0;
   border: 1px solid var(--border-color);
 }
 
@@ -201,6 +198,7 @@ body {
 
 .tab-content.active {
   display: block;
+  padding-top: 16px;
 }
 
 @keyframes fadeSlideIn {
