@@ -172,6 +172,21 @@
     <button type="button" class="timer-btn timer-close" onclick="stopRestTimer()">×</button>
   </div>
 
+  <!-- 履歴詳細モーダル（ボトムシート） -->
+  <div id="history-modal" class="modal" hidden>
+    <div class="modal-backdrop" onclick="closeHistoryDetail()"></div>
+    <div class="modal-sheet" role="dialog" aria-modal="true" aria-labelledby="history-modal-title">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <h2 id="history-modal-title">記録の詳細</h2>
+        <button type="button" class="modal-close" onclick="closeHistoryDetail()" aria-label="閉じる">×</button>
+      </div>
+      <div id="history-modal-body" class="modal-body">
+        <!-- JSで動的に生成 -->
+      </div>
+    </div>
+  </div>
+
   <!-- トースト通知 -->
   <div id="toast" class="toast"></div>
 
