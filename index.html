@@ -78,14 +78,20 @@
         </div>
       </div>
 
+      <div id="today-summary" class="today-summary" hidden>
+        <!-- JSで動的に生成: セット数 / レップ / 推定総負荷 -->
+      </div>
+
       <div class="section-title">Training Menu</div>
       <div id="menu-container">
         <!-- JSで動的に生成 -->
       </div>
 
-      <button id="save-btn" class="btn-primary mt-16" onclick="saveWorkout()">
-        <span>💾 実績を保存する</span>
-      </button>
+      <div class="save-bar">
+        <button id="save-btn" class="btn-primary" onclick="saveWorkout()">
+          <span id="save-btn-label">💾 実績を保存する</span>
+        </button>
+      </div>
     </main>
 
     <!-- タブコンテンツ: プログラム全体 -->

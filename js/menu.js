@@ -143,6 +143,8 @@ function renderMenu() {
     const maxWeight = getMaxWeight();
     const dayData = getDayData(programId, weekNum, dayNum);
 
+    renderTodaySummary(dayData, maxWeight);
+
     if (!dayData) {
         container.innerHTML = `
       <div class="empty-state">
@@ -150,6 +152,7 @@ function renderMenu() {
         <div class="message">このDayのメニューはありません</div>
       </div>
     `;
+        updateSaveButtonState();
         return;
     }
 
@@ -176,17 +179,19 @@ function renderMenu() {
 
         // セット行
         for (let s = 1; s <= ex.target_sets; s++) {
+            const chkId = `chk-${exIdx}-${s}`;
             html += `<div class="set-row">`;
-            html += `  <div class="set-checkbox">`;
-            html += `    <input type="checkbox" id="chk-${exIdx}-${s}" class="set-check-input" checked>`;
-            html += `  </div>`;
-            html += `  <div class="set-number">${s}</div>`;
-            html += `  <div class="set-target">`;
-            html += `    <span class="weight-value">${targetWeight}kg</span> × <span class="reps-value">${ex.target_reps}回</span>`;
+            // 行全体（チェック〜目標）を <label> でくるみ、タップで切替
+            html += `  <label class="set-row-toggle" for="${chkId}">`;
+            html += `    <input type="checkbox" id="${chkId}" class="set-check-input" checked>`;
+            html += `    <div class="set-number">${s}</div>`;
+            html += `    <div class="set-target">`;
+            html += `      <span class="weight-value">${targetWeight}kg</span> × <span class="reps-value">${ex.target_reps}回</span>`;
             if (ex.rpe_target) {
                 html += ` <small class="rpe-target">@${ex.rpe_target}</small>`;
             }
-            html += `  </div>`;
+            html += `    </div>`;
+            html += `  </label>`;
             html += `  <div class="set-inputs">`;
             // 重量ステッパー
             html += `    <div class="stepper-group">`;
@@ -214,6 +219,82 @@ function renderMenu() {
     });
 
     container.innerHTML = html;
+
+    // セット数・重量・回数の変化で保存ボタン状態を更新
+    container.querySelectorAll('.set-check-input, .stepper-value').forEach(el => {
+        el.addEventListener('change', updateSaveButtonState);
+        el.addEventListener('input', updateSaveButtonState);
+    });
+
+    updateSaveButtonState();
+}
+
+/**
+ * 今日のサマリーカードを描画
+ * @param {object|null} dayData
+ * @param {number} maxWeight
+ */
+function renderTodaySummary(dayData, maxWeight) {
+    const el = document.getElementById('today-summary');
+    if (!el) return;
+    if (!dayData) { el.hidden = true; return; }
+
+    let totalSets = 0;
+    let totalReps = 0;
+    let totalVolume = 0;
+    dayData.exercises.forEach(ex => {
+        const w = calcTargetWeight(maxWeight, ex.percentage_of_max);
+        totalSets += ex.target_sets;
+        totalReps += ex.target_sets * ex.target_reps;
+        totalVolume += w * ex.target_reps * ex.target_sets;
+    });
+
+    el.hidden = false;
+    el.innerHTML = `
+      <div class="summary-item">
+        <div class="summary-label">SETS</div>
+        <div class="summary-value">${totalSets}</div>
+      </div>
+      <div class="summary-item">
+        <div class="summary-label">REPS</div>
+        <div class="summary-value">${totalReps}</div>
+      </div>
+      <div class="summary-item">
+        <div class="summary-label">VOLUME</div>
+        <div class="summary-value">${totalVolume.toLocaleString()}<small>kg</small></div>
+      </div>
+    `;
+}
+
+/**
+ * 保存ボタンのラベル・有効状態を、現在チェックされているセットから算出して更新
+ */
+function updateSaveButtonState() {
+    const btn = document.getElementById('save-btn');
+    const label = document.getElementById('save-btn-label');
+    if (!btn || !label) return;
+
+    const checkedBoxes = document.querySelectorAll('.set-check-input:checked');
+    const count = checkedBoxes.length;
+
+    if (count === 0) {
+        btn.disabled = true;
+        label.textContent = '保存するセットを選択してください';
+        return;
+    }
+
+    // 推定総負荷（チェック済みセットのみ）
+    let vol = 0;
+    checkedBoxes.forEach(cb => {
+        const m = cb.id.match(/^chk-(\d+)-(\d+)$/);
+        if (!m) return;
+        const w = parseFloat(document.getElementById(`w-${m[1]}-${m[2]}`)?.value || '0');
+        const r = parseInt(document.getElementById(`r-${m[1]}-${m[2]}`)?.value || '0', 10);
+        vol += w * r;
+    });
+
+    btn.disabled = false;
+    label.textContent = `💾 ${count}セット保存　(${vol.toLocaleString()}kg)`;
 }
 
 /**

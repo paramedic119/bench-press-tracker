@@ -114,6 +114,7 @@ function renderProgress() {
     }
 
     const completed = getCompletedDays(programId);
+    const nextSession = getNextDay(programId); // {week, day} or null
 
     // 完了数 / 全Day数
     let totalDays = 0;
@@ -153,13 +154,20 @@ function renderProgress() {
         week.days.forEach(day => {
             const key = `W${week.week_number}D${day.day_number}`;
             const done = completed.has(key);
+            const isNext = !done && nextSession &&
+                nextSession.week === week.week_number &&
+                nextSession.day === day.day_number;
             // 種目要約
             const exSummary = day.exercises.map(ex => {
                 const name = EXERCISE_NAMES[ex.type] || ex.type;
                 return `${name} ${ex.percentage_of_max}%`;
             }).join(', ');
 
-            html += `<div class="progress-day-card ${done ? 'done' : ''}" `;
+            const cardClasses = ['progress-day-card'];
+            if (done) cardClasses.push('done');
+            if (isNext) cardClasses.push('next');
+
+            html += `<div class="${cardClasses.join(' ')}" `;
             html += `  onclick="navigateToDay('${programId}', ${week.week_number}, ${day.day_number})">`;
             html += `  <div class="progress-day-top">`;
             html += `    <span class="progress-day-label">Day ${day.day_number}</span>`;
