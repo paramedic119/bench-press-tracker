@@ -42,7 +42,7 @@ function renderCharts() {
     const chartSection = document.getElementById('chart-section');
     const emptyState = document.getElementById('chart-empty');
 
-    if (history.length === 0) {
+    if (allHistory.length === 0) {
         if (chartSection) chartSection.style.display = 'none';
         if (emptyState) emptyState.style.display = 'flex';
         return;
@@ -50,6 +50,17 @@ function renderCharts() {
 
     if (chartSection) chartSection.style.display = 'block';
     if (emptyState) emptyState.style.display = 'none';
+
+    // ヒートマップは全履歴ベースで描画（期間フィルタの影響を受けない）
+    renderHeatmap(allHistory);
+
+    // 期間フィルタ後の履歴が空の場合は折れ線/棒グラフは描かずに早期 return
+    if (history.length === 0) {
+        // 期間内0件: 既存のチャートを残さないため destroy
+        if (maxWeightChart) { maxWeightChart.destroy(); maxWeightChart = null; }
+        if (volumeChart) { volumeChart.destroy(); volumeChart = null; }
+        return;
+    }
 
     // データ抽出
     const labels = history.map(rec => formatDate(new Date(rec.date)));
@@ -144,6 +155,140 @@ function renderCharts() {
             options: getChartOptions('トレーニングボリューム')
         });
     }
+}
+
+// ==================================================
+// トレーニング頻度ヒートマップ（直近12週間 × 7曜日）
+// ==================================================
+
+const HEATMAP_WEEKS = 12;
+
+/**
+ * 履歴からヒートマップを描画。曜日は月〜日（左上が月）。
+ * @param {Array<object>} allHistory - 時系列ソート済み（古→新）の履歴
+ */
+function renderHeatmap(allHistory) {
+    const container = document.getElementById('heatmap-container');
+    if (!container) return;
+
+    // 日付キー（YYYY-MM-DD・ローカルタイム）でボリュームを集計
+    const volByDate = {};
+    allHistory.forEach(rec => {
+        const key = _dateKeyLocal(new Date(rec.date));
+        let v = 0;
+        rec.exercises.forEach(ex => ex.sets.forEach(s => { v += s.weight * s.reps; }));
+        volByDate[key] = (volByDate[key] || 0) + v;
+    });
+
+    // グリッド開始日: 今日を含む週の月曜から (HEATMAP_WEEKS - 1) 週前の月曜
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const dow = (today.getDay() + 6) % 7; // 0=月 ... 6=日
+    const gridStart = new Date(today);
+    gridStart.setDate(today.getDate() - dow - (HEATMAP_WEEKS - 1) * 7);
+
+    // 期間内ボリュームから上位を取って強度しきい値を算出（外れ値耐性のため P90 を上限）
+    const inRangeVols = [];
+    for (let w = 0; w < HEATMAP_WEEKS; w++) {
+        for (let d = 0; d < 7; d++) {
+            const cell = new Date(gridStart);
+            cell.setDate(gridStart.getDate() + w * 7 + d);
+            if (cell > today) continue;
+            const v = volByDate[_dateKeyLocal(cell)] || 0;
+            if (v > 0) inRangeVols.push(v);
+        }
+    }
+    inRangeVols.sort((a, b) => a - b);
+    const p90 = inRangeVols.length > 0
+        ? inRangeVols[Math.min(inRangeVols.length - 1, Math.floor(inRangeVols.length * 0.9))]
+        : 1;
+
+    // 統計サマリー
+    const sessions = inRangeVols.length;
+    const perWeek = (sessions / HEATMAP_WEEKS).toFixed(1);
+    const totalVol = inRangeVols.reduce((s, v) => s + v, 0);
+    const totalVolStr = totalVol >= 10000
+        ? `${(totalVol / 1000).toFixed(1)}k`
+        : totalVol.toLocaleString();
+
+    // グリッド HTML 構築
+    const dayLabels = ['月', '火', '水', '木', '金', '土', '日'];
+    let html = '';
+
+    html += `<div class="heatmap-stats">`;
+    html += `  <div class="hm-stat"><div class="hm-stat-label">SESSIONS</div><div class="hm-stat-value">${sessions}</div></div>`;
+    html += `  <div class="hm-stat"><div class="hm-stat-label">PER WEEK</div><div class="hm-stat-value">${perWeek}</div></div>`;
+    html += `  <div class="hm-stat"><div class="hm-stat-label">VOLUME</div><div class="hm-stat-value">${totalVolStr}<small>kg</small></div></div>`;
+    html += `</div>`;
+
+    html += `<div class="heatmap">`;
+    // 曜日ラベル列
+    html += `<div class="heatmap-day-labels">`;
+    dayLabels.forEach((d, i) => {
+        // 月・水・金のみ表示してスペース節約
+        const visible = i % 2 === 0;
+        html += `<div class="heatmap-day-label">${visible ? d : ''}</div>`;
+    });
+    html += `</div>`;
+    // 週のカラム
+    html += `<div class="heatmap-weeks">`;
+    for (let w = 0; w < HEATMAP_WEEKS; w++) {
+        html += `<div class="heatmap-week">`;
+        for (let d = 0; d < 7; d++) {
+            const cell = new Date(gridStart);
+            cell.setDate(gridStart.getDate() + w * 7 + d);
+            const key = _dateKeyLocal(cell);
+            const v = volByDate[key] || 0;
+            const isFuture = cell > today;
+            const level = isFuture ? -1 : _heatmapLevel(v, p90);
+            const cls = isFuture
+                ? 'heatmap-cell future'
+                : `heatmap-cell level-${level}`;
+            const title = isFuture
+                ? key
+                : (v > 0 ? `${key}: ${v.toLocaleString()}kg` : `${key}: 休`);
+            html += `<div class="${cls}" title="${title}"></div>`;
+        }
+        html += `</div>`;
+    }
+    html += `</div>`;
+    html += `</div>`;
+
+    // 凡例
+    html += `<div class="heatmap-legend">`;
+    html += `  <span>Less</span>`;
+    html += `  <div class="heatmap-cell level-0"></div>`;
+    html += `  <div class="heatmap-cell level-1"></div>`;
+    html += `  <div class="heatmap-cell level-2"></div>`;
+    html += `  <div class="heatmap-cell level-3"></div>`;
+    html += `  <div class="heatmap-cell level-4"></div>`;
+    html += `  <span>More</span>`;
+    html += `</div>`;
+
+    container.innerHTML = html;
+}
+
+/**
+ * Date を YYYY-MM-DD のローカル日付文字列に。`toISOString()` だと UTC ずれが
+ * 起きるので getFullYear/Month/Date を使う。
+ */
+function _dateKeyLocal(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${dd}`;
+}
+
+/**
+ * ボリュームから 0〜4 の強度レベルを返す（P90 を上限の基準にする）
+ */
+function _heatmapLevel(v, p90) {
+    if (v <= 0) return 0;
+    const r = Math.min(1, v / p90);
+    if (r < 0.25) return 1;
+    if (r < 0.5) return 2;
+    if (r < 0.75) return 3;
+    return 4;
 }
 
 /**

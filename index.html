@@ -131,12 +131,6 @@
     <section id="tab-chart" class="tab-content">
       <div class="section-title">Progress Analysis</div>
 
-      <div class="period-filter">
-        <button class="period-btn" data-period="1m" onclick="setChartPeriod('1m')">1ヶ月</button>
-        <button class="period-btn" data-period="3m" onclick="setChartPeriod('3m')">3ヶ月</button>
-        <button class="period-btn active" data-period="all" onclick="setChartPeriod('all')">全期間</button>
-      </div>
-
       <div id="chart-empty" class="empty-state">
         <div class="icon">📈</div>
         <div class="message">
@@ -146,6 +140,22 @@
       </div>
 
       <div id="chart-section" style="display: none;">
+        <div class="chart-section">
+          <h3>🔥 トレーニング頻度 <small class="chart-hint">直近12週間</small></h3>
+          <div id="heatmap-container" class="heatmap-container">
+            <!-- JSで動的に生成 -->
+          </div>
+        </div>
+
+        <div class="chart-period-row">
+          <div class="chart-period-label">推移グラフの期間</div>
+          <div class="period-filter">
+            <button class="period-btn" data-period="1m" onclick="setChartPeriod('1m')">1ヶ月</button>
+            <button class="period-btn" data-period="3m" onclick="setChartPeriod('3m')">3ヶ月</button>
+            <button class="period-btn active" data-period="all" onclick="setChartPeriod('all')">全期間</button>
+          </div>
+        </div>
+
         <div class="chart-section">
           <h3>🏆 推定1RM 推移 <small class="chart-hint">⭐ = 自己ベスト更新</small></h3>
           <div class="chart-container">
