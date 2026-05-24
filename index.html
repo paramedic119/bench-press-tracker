@@ -170,6 +170,15 @@
       </div>
 
       <div class="settings-group">
+        <div class="settings-group-title">📝 カスタムプログラム</div>
+        <p class="settings-help">自分用のプログラムを作成・編集できます。週・Day・種目を自由に組み合わせて構築できます。</p>
+        <div id="custom-program-list" class="custom-program-list">
+          <!-- JSで動的に生成 -->
+        </div>
+        <button class="btn-secondary" onclick="openProgramEditor()">➕ 新規作成</button>
+      </div>
+
+      <div class="settings-group">
         <div class="settings-group-title">🏅 アチーブメント</div>
         <div id="achievements-list" class="achievements-list">
           <!-- JSで動的に生成 -->
@@ -244,6 +253,46 @@
     <button type="button" class="timer-btn timer-close" onclick="stopRestTimer()">×</button>
   </div>
 
+  <!-- カスタムプログラム エディタ（ボトムシート / 全画面） -->
+  <div id="program-editor-modal" class="modal" hidden>
+    <div class="modal-backdrop" onclick="closeProgramEditor()"></div>
+    <div class="modal-sheet modal-sheet-full" role="dialog" aria-modal="true" aria-labelledby="program-editor-title">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <h2 id="program-editor-title">新規プログラム作成</h2>
+        <button type="button" class="modal-close" onclick="closeProgramEditor()" aria-label="閉じる">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="pe-section">
+          <label for="pe-name">プログラム名 <span class="pe-required">*</span></label>
+          <input type="text" id="pe-name" placeholder="例: マイベンチ5/3/1" maxlength="50">
+        </div>
+        <div class="pe-section">
+          <label for="pe-description">説明</label>
+          <input type="text" id="pe-description" placeholder="任意" maxlength="100">
+        </div>
+        <div class="pe-section">
+          <label for="pe-main-lift">メインリフト</label>
+          <select id="pe-main-lift">
+            <option value="bench_press">ベンチプレス</option>
+            <option value="squat">スクワット</option>
+            <option value="deadlift">デッドリフト</option>
+          </select>
+        </div>
+
+        <div class="pe-section-divider">プログラム内容</div>
+        <div id="pe-weeks">
+          <!-- JSで動的に生成 -->
+        </div>
+        <button type="button" class="btn-secondary pe-add-week" onclick="addWeekToEditor()">+ 週を追加</button>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeProgramEditor()">キャンセル</button>
+        <button type="button" class="btn-primary" onclick="saveProgramEditor()">保存</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 履歴詳細モーダル（ボトムシート） -->
   <div id="history-modal" class="modal" hidden>
     <div class="modal-backdrop" onclick="closeHistoryDetail()"></div>
@@ -270,6 +319,7 @@
   <script src="js/progress.js"></script>
   <script src="js/chart.js"></script>
   <script src="js/achievements.js"></script>
+  <script src="js/program-editor.js"></script>
 
 </body>
 

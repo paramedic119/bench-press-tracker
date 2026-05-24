@@ -9,6 +9,7 @@ const LS_KEY_HISTORY = 'bp_history';
 const LS_KEY_WEEK = 'bp_selected_week';
 const LS_KEY_DAY = 'bp_selected_day';
 const LS_KEY_PROGRAM = 'bp_selected_program';
+const LS_KEY_CUSTOM_PROGRAMS = 'bp_custom_programs';
 
 // --- GAS環境判定 ---
 const IS_GAS = (typeof google !== 'undefined' && typeof google.script !== 'undefined' && typeof google.script.run !== 'undefined');
@@ -169,6 +170,47 @@ function getSelectedProgramId() {
  */
 function setSelectedProgramId(id) {
     _setData(LS_KEY_PROGRAM, id);
+}
+
+// ==================================================
+// カスタムプログラム（ユーザー作成）
+// ==================================================
+
+/**
+ * カスタムプログラム一覧をストレージから取得
+ * @returns {Array<object>}
+ */
+function getCustomPrograms() {
+    const stored = _getData(LS_KEY_CUSTOM_PROGRAMS);
+    try {
+        const arr = stored ? JSON.parse(stored) : [];
+        return Array.isArray(arr) ? arr : [];
+    } catch (e) { return []; }
+}
+
+/**
+ * カスタムプログラム一覧をストレージへ保存
+ * @param {Array<object>} programs
+ */
+function saveCustomPrograms(programs) {
+    _setData(LS_KEY_CUSTOM_PROGRAMS, JSON.stringify(programs));
+}
+
+/**
+ * ストレージのカスタムプログラムを PROGRAMS 配列へ反映。
+ * 既存IDがあれば置換、無ければ末尾追加。`isCustom` フラグを立てる。
+ * 初期化時とエディタ保存後に呼ばれる。
+ */
+function syncCustomProgramsIntoArray() {
+    const customs = getCustomPrograms();
+    // 既存のカスタムを一度削除（純粋に再ロード）
+    for (let i = PROGRAMS.length - 1; i >= 0; i--) {
+        if (PROGRAMS[i].isCustom) PROGRAMS.splice(i, 1);
+    }
+    customs.forEach(p => {
+        p.isCustom = true;
+        PROGRAMS.push(p);
+    });
 }
 
 // --- トースト通知（キュー方式で連発時の上書きを防止） ---
@@ -453,6 +495,7 @@ function exportData() {
         unlockedAchievements: Array.from(
             typeof getUnlockedAchievements === 'function' ? getUnlockedAchievements() : []
         ),
+        customPrograms: getCustomPrograms(),
         history: getHistory()
     };
     const json = JSON.stringify(payload, null, 2);
@@ -509,9 +552,14 @@ function importData(event) {
             if (Array.isArray(data.unlockedAchievements) && typeof setUnlockedAchievements === 'function') {
                 setUnlockedAchievements(new Set(data.unlockedAchievements));
             }
+            if (Array.isArray(data.customPrograms)) {
+                saveCustomPrograms(data.customPrograms);
+                syncCustomProgramsIntoArray();
+            }
             setHistory(data.history);
 
-            // UI 全体を再構築
+            // UI 全体を再構築（カスタムプログラムが含まれる可能性があるので select も再構築）
+            if (typeof refreshProgramSelect === 'function') refreshProgramSelect();
             const progSel = document.getElementById('program-select');
             if (progSel) progSel.value = getSelectedProgramId();
             updateWeekOptions();
@@ -556,6 +604,8 @@ function renderSettings() {
     // 履歴件数
     const rc = document.getElementById('record-count');
     if (rc) rc.textContent = `${getHistory().length}件`;
+    // カスタムプログラム一覧
+    if (typeof renderCustomProgramList === 'function') renderCustomProgramList();
     // アチーブメント一覧
     if (typeof renderAchievements === 'function') renderAchievements();
 }
@@ -582,7 +632,7 @@ function resetAllData() {
     if (!confirm('本当にリセットしますか？（最終確認）')) return;
 
     // 既知の全キーを削除
-    const keys = [LS_KEY_MAX, LS_KEY_HISTORY, LS_KEY_PROGRAM, LS_KEY_REST_SEC];
+    const keys = [LS_KEY_MAX, LS_KEY_HISTORY, LS_KEY_PROGRAM, LS_KEY_REST_SEC, LS_KEY_CUSTOM_PROGRAMS];
     if (typeof LS_KEY_ACHIEVEMENTS !== 'undefined') keys.push(LS_KEY_ACHIEVEMENTS);
     Object.keys(LIFT_NAMES).forEach(lift => {
         keys.push(_maxKeyForLift(lift));
@@ -591,6 +641,9 @@ function resetAllData() {
         keys.push(`${LS_KEY_WEEK}_${p.id}`);
         keys.push(`${LS_KEY_DAY}_${p.id}`);
     });
+
+    // カスタムプログラムを PROGRAMS から除去
+    syncCustomProgramsIntoArray(); // ストレージは消える前に空になる前提だが念のため再同期は後段
 
     if (isGasEnv()) {
         keys.forEach(k => { delete _dataCache[k]; });
@@ -617,6 +670,8 @@ function resetAllData() {
  * アプリのUI初期化（データロード後に呼ばれる）
  */
 function _initApp() {
+    // カスタムプログラムを PROGRAMS に注入してから UI 初期化
+    syncCustomProgramsIntoArray();
     initTabs();
     initMaxWeightInput();
     initSelectors();

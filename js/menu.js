@@ -11,17 +11,13 @@ function initSelectors() {
     const daySelect = document.getElementById('day-select');
     if (!programSelect || !weekSelect || !daySelect) return;
 
-    // Programオプション生成
-    PROGRAMS.forEach(p => {
-        const opt = document.createElement('option');
-        opt.value = p.id;
-        opt.textContent = p.name;
-        programSelect.appendChild(opt);
-    });
+    refreshProgramSelect();
 
     // 保存されたProgramがあれば復元
     const savedProgram = getSelectedProgramId();
-    programSelect.value = savedProgram;
+    if (PROGRAMS.find(p => p.id === savedProgram)) {
+        programSelect.value = savedProgram;
+    }
 
     // Week選択肢を更新
     updateWeekOptions();
@@ -82,6 +78,29 @@ function initSelectors() {
         _setData(`${LS_KEY_DAY}_${progId}`, daySelect.value);
         renderMenu();
     });
+}
+
+/**
+ * プログラム選択 select を PROGRAMS から再構築。現在選択値は可能な限り維持。
+ * カスタムプログラム追加・削除時に呼ぶ。
+ */
+function refreshProgramSelect() {
+    const programSelect = document.getElementById('program-select');
+    if (!programSelect) return;
+    const currentVal = programSelect.value;
+    programSelect.innerHTML = '';
+    PROGRAMS.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = p.isCustom ? `📝 ${p.name}` : p.name;
+        programSelect.appendChild(opt);
+    });
+    if (currentVal && PROGRAMS.find(p => p.id === currentVal)) {
+        programSelect.value = currentVal;
+    } else if (PROGRAMS.length > 0) {
+        programSelect.value = PROGRAMS[0].id;
+        setSelectedProgramId(PROGRAMS[0].id);
+    }
 }
 
 /**
