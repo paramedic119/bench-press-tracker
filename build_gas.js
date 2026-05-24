@@ -11,6 +11,10 @@ if (!fs.existsSync(distDir)) {
 // 1. htmlの読み込み
 let html = fs.readFileSync(path.join(srcDir, 'index.html'), 'utf8');
 
+// 1.5 PWA関連リンクを除去（GASのiframeサンドボックスでは動作しないため）
+html = html.replace(/<link rel="manifest"[^>]*>\s*/g, '');
+html = html.replace(/<link rel="apple-touch-icon"[^>]*>\s*/g, '');
+
 // 2. cssのインライン化
 html = html.replace(/<link rel="stylesheet" href="([^"]+)">/g, (match, p1) => {
     const cssPath = path.join(srcDir, p1);

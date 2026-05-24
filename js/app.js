@@ -614,4 +614,10 @@ document.addEventListener('DOMContentLoaded', () => {
             _flushSyncNow();
         }
     });
+
+    // PWA: Service Worker 登録（GAS環境ではiframe内で動かないためスキップ）
+    if ('serviceWorker' in navigator && !isGasEnv()) {
+        navigator.serviceWorker.register('./service-worker.js')
+            .catch(err => console.warn('Service Worker 登録に失敗:', err));
+    }
 });
