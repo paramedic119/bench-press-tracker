@@ -17,6 +17,10 @@ const IS_GAS = (typeof google !== 'undefined' && typeof google.script !== 'undef
 /** @type {Object<string, string>} */
 let _dataCache = {};
 
+// サーバーからの初期データ読込に失敗した場合 true。
+// この状態で書込みを許すと空キャッシュでサーバーを上書きし既存データを失うため、書込みを抑止する。
+let _dataLoadFailed = false;
+
 /**
  * GAS環境かどうかを判定
  * @returns {boolean}
@@ -47,6 +51,10 @@ function _getData(key) {
  */
 function _setData(key, value) {
     if (isGasEnv()) {
+        if (_dataLoadFailed) {
+            showToast('⚠️ サーバー読込失敗のため保存できません。再読込してください', 4000);
+            return;
+        }
         _dataCache[key] = value;
         _syncToServer();
     } else {
@@ -54,21 +62,33 @@ function _setData(key, value) {
     }
 }
 
+let _syncTimer = null;
+
 /**
  * インメモリキャッシュをサーバーへ非同期保存（デバウンス付き）
  */
-let _syncTimer = null;
 function _syncToServer() {
-    if (!isGasEnv()) return;
+    if (!isGasEnv() || _dataLoadFailed) return;
     if (_syncTimer) clearTimeout(_syncTimer);
-    _syncTimer = setTimeout(() => {
-        const jsonStr = JSON.stringify(_dataCache);
-        google.script.run
-            .withFailureHandler((err) => {
-                console.error('サーバー保存エラー:', err);
-            })
-            .saveAllData(jsonStr);
-    }, 500);
+    _syncTimer = setTimeout(_flushSyncNow, 500);
+}
+
+/**
+ * デバウンス待ちをスキップして即座にサーバーへ送信。
+ * ページ非表示・離脱イベント等から呼び、未同期データの消失を防ぐ。
+ */
+function _flushSyncNow() {
+    if (_syncTimer) {
+        clearTimeout(_syncTimer);
+        _syncTimer = null;
+    }
+    if (!isGasEnv() || _dataLoadFailed) return;
+    const jsonStr = JSON.stringify(_dataCache);
+    google.script.run
+        .withFailureHandler((err) => {
+            console.error('サーバー保存エラー:', err);
+        })
+        .saveAllData(jsonStr);
 }
 
 // --- 公開API（既存インターフェース維持） ---
@@ -214,12 +234,24 @@ document.addEventListener('DOMContentLoaded', () => {
             })
             .withFailureHandler((err) => {
                 console.error('サーバーデータ読み込みエラー:', err);
+                // 空キャッシュで上書きしないため書込みを抑止
+                _dataLoadFailed = true;
                 _dataCache = {};
                 _initApp();
+                showToast('⚠️ データ読込に失敗しました。保存は無効です。再読込してください', 6000);
             })
             .loadAllData();
     } else {
         // ローカル環境: 従来通りlocalStorageを使用
         _initApp();
     }
+
+    // ページ離脱・バックグラウンド遷移時に未同期データをフラッシュ。
+    // pagehide はモバイルブラウザでも比較的確実に発火する。
+    window.addEventListener('pagehide', _flushSyncNow);
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') {
+            _flushSyncNow();
+        }
+    });
 });
