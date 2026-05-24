@@ -125,7 +125,7 @@ function renderProgress() {
     let html = '';
 
     // タイトル追加
-    html += `<h2 class="section-title">${program.name}</h2>`;
+    html += `<h2 class="section-title">${escapeHtml(program.name)}</h2>`;
 
     // プログレスバー
     html += `<div class="progress-summary">`;

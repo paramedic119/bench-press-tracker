@@ -4,9 +4,10 @@
    GAS環境ではアプリ側でSW登録をスキップする。
    ================================================== */
 
-const CACHE_NAME = 'bp-tracker-v1';
+// バージョンを上げるとアクティベート時に旧キャッシュが purge され、最新コードが配信される
+const CACHE_NAME = 'bp-tracker-v3';
 
-// オフラインで動かす最低限のリソース
+// オフラインで動かすリソース。スクリプトを追加した際は必ずここにも反映する
 const PRECACHE_ASSETS = [
     './',
     './index.html',
@@ -19,6 +20,8 @@ const PRECACHE_ASSETS = [
     './js/progress.js',
     './js/chart.js',
     './js/achievements.js',
+    './js/program-editor.js',
+    './js/program-generator.js',
     './Blue_Angels_Insignia.svg.png'
 ];
 

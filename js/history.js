@@ -43,7 +43,7 @@ function renderHistory() {
         <input type="checkbox" class="history-checkbox" value="${rec.id}"
                onclick="event.stopPropagation(); updateDeleteBtnState();">
         <div class="history-info">
-          <div class="history-date">📅 ${dateStr} [${rec.programName || 'BPS'}] W${rec.week}D${rec.day}</div>
+          <div class="history-date">📅 ${dateStr} [${escapeHtml(rec.programName || 'BPS')}] W${rec.week}D${rec.day}</div>
           <div class="history-detail">${exerciseSummary}</div>
           <div class="history-volume">📊 Volume: ${totalVolume.toLocaleString()}kg</div>
         </div>
@@ -185,7 +185,7 @@ function _renderHistoryDetailHTML(rec) {
     let html = '';
     html += `<div class="detail-header">`;
     html += `  <div class="detail-date">📅 ${dateStr}</div>`;
-    html += `  <div class="detail-meta">${rec.programName || '不明'} · Week ${rec.week} Day ${rec.day}${rec.maxWeight ? ` · MAX ${rec.maxWeight}kg` : ''}</div>`;
+    html += `  <div class="detail-meta">${escapeHtml(rec.programName || '不明')} · Week ${rec.week} Day ${rec.day}${rec.maxWeight ? ` · MAX ${rec.maxWeight}kg` : ''}</div>`;
     html += `</div>`;
 
     rec.exercises.forEach(ex => {

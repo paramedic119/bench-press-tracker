@@ -81,20 +81,43 @@ function initSelectors() {
 }
 
 /**
- * プログラム選択 select を PROGRAMS から再構築。現在選択値は可能な限り維持。
- * カスタムプログラム追加・削除時に呼ぶ。
+ * プログラム選択 select を PROGRAMS から再構築。
+ * 組込プログラムとカスタムプログラムを optgroup で視覚的に分離。
+ * 現在選択値は可能な限り維持。
  */
 function refreshProgramSelect() {
     const programSelect = document.getElementById('program-select');
     if (!programSelect) return;
     const currentVal = programSelect.value;
     programSelect.innerHTML = '';
-    PROGRAMS.forEach(p => {
-        const opt = document.createElement('option');
-        opt.value = p.id;
-        opt.textContent = p.isCustom ? `📝 ${p.name}` : p.name;
-        programSelect.appendChild(opt);
-    });
+
+    const builtin = PROGRAMS.filter(p => !p.isCustom);
+    const customs = PROGRAMS.filter(p => p.isCustom);
+
+    const appendOpts = (parent, list) => {
+        list.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.id;
+            opt.textContent = p.name;
+            parent.appendChild(opt);
+        });
+    };
+
+    if (customs.length > 0) {
+        const gBuiltin = document.createElement('optgroup');
+        gBuiltin.label = '📚 組込プログラム';
+        appendOpts(gBuiltin, builtin);
+        programSelect.appendChild(gBuiltin);
+
+        const gCustom = document.createElement('optgroup');
+        gCustom.label = '📝 カスタム';
+        appendOpts(gCustom, customs);
+        programSelect.appendChild(gCustom);
+    } else {
+        // カスタム0件のときは optgroup なしでフラット表示
+        appendOpts(programSelect, builtin);
+    }
+
     if (currentVal && PROGRAMS.find(p => p.id === currentVal)) {
         programSelect.value = currentVal;
     } else if (PROGRAMS.length > 0) {

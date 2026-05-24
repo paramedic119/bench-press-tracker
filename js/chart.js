@@ -115,6 +115,8 @@ function renderCharts() {
     // Chart.js 未ロード時は折れ線/棒グラフをスキップ（ヒートマップは描画済）
     if (!chartLibLoaded) {
         console.warn('Chart.js が読み込まれていません。推移グラフをスキップします。');
+        _renderChartFallback('maxWeightChart');
+        _renderChartFallback('volumeChart');
         return;
     }
 
@@ -344,4 +346,24 @@ function getChartOptions(title) {
             }
         }
     };
+}
+
+/**
+ * Chart.js 未ロード時、canvas を覆うフォールバックメッセージを表示
+ */
+function _renderChartFallback(canvasId) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    const parent = canvas.parentElement;
+    if (!parent) return;
+    // 既存フォールバックがあれば差し替えで終了
+    if (parent.querySelector('.chart-fallback')) return;
+    canvas.style.display = 'none';
+    const fb = document.createElement('div');
+    fb.className = 'chart-fallback';
+    fb.innerHTML = `
+      <div class="cf-icon">📡</div>
+      <div class="cf-msg">グラフライブラリの読み込みに失敗しました<br><small>オフラインの場合はネットワーク復帰後に再読込してください</small></div>
+    `;
+    parent.appendChild(fb);
 }

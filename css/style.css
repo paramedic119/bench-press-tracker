@@ -196,19 +196,43 @@ body {
 
 .tab-btn {
   flex: 1;
-  padding: 12px 6px;
+  min-width: 0; /* 5タブが狭幅でも overflow しないよう */
+  padding: 8px 4px;
   min-height: 44px;
   border: none;
   border-radius: var(--radius-md);
   background: transparent;
   color: var(--text-muted);
   font-family: inherit;
-  font-size: 0.82rem;
+  font-size: 0.78rem;
   font-weight: 600;
   cursor: pointer;
   transition: all var(--transition-normal);
   position: relative;
   white-space: nowrap;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  overflow: hidden;
+}
+
+.tab-icon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.tab-text {
+  font-size: 0.7rem;
+  line-height: 1.1;
+}
+
+/* 狭幅では文字を隠してアイコンのみ表示し、5タブを確実に並べる */
+@media (max-width: 360px) {
+  .tab-text { display: none; }
+  .tab-icon { font-size: 1.2rem; }
+  .tab-nav { gap: 2px; padding: 3px; }
 }
 
 .tab-btn:hover {
@@ -1036,6 +1060,33 @@ body {
 .chart-container canvas {
   width: 100% !important;
   max-height: 260px;
+}
+
+.chart-fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.chart-fallback .cf-icon {
+  font-size: 2rem;
+  margin-bottom: 8px;
+  opacity: 0.6;
+}
+
+.chart-fallback .cf-msg {
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.chart-fallback .cf-msg small {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  opacity: 0.7;
 }
 
 .chart-empty {
@@ -1992,9 +2043,24 @@ body {
 
 .pe-ex-row-fields {
   display: grid;
-  grid-template-columns: repeat(4, 1fr) auto;
+  /* 数値4つを2行2列、AMRAPは右端に独立配置。狭幅でも各入力が読める幅を確保 */
+  grid-template-columns: 1fr 1fr 1fr 1fr;
   gap: 6px;
   align-items: end;
+}
+
+.pe-checkbox-inline {
+  grid-column: 1 / -1;
+  justify-content: center;
+  border-top: 1px dashed rgba(46, 51, 80, 0.4);
+  padding-top: 6px;
+  margin-top: 2px;
+}
+
+@media (max-width: 380px) {
+  .pe-ex-row-fields {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 .pe-field {
@@ -2099,6 +2165,13 @@ body {
   border-top: 1px solid var(--border-color);
 }
 
+/* 「リフト選択」直後の最初のラベルは区切り線を重複させない */
+.pe-section + .pg-section-label {
+  margin-top: 8px;
+  padding-top: 0;
+  border-top: none;
+}
+
 .pg-analysis {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -2137,12 +2210,16 @@ body {
   margin-left: 2px;
 }
 
+/* データなし時は grid を解除して全幅メッセージとして見せる */
+.pg-analysis:has(.pg-no-data) {
+  display: block;
+}
+
 .pg-no-data {
-  grid-column: 1 / -1;
   font-size: 0.78rem;
   color: var(--text-muted);
   text-align: center;
-  padding: 8px 4px;
+  padding: 12px 4px;
   line-height: 1.5;
 }
 

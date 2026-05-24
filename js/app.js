@@ -265,6 +265,11 @@ function initTabs() {
             const targetEl = document.getElementById(`tab-${target}`);
             if (targetEl) targetEl.classList.add('active');
 
+            // メニュータブ以外に切替時はインターバルタイマーを閉じて画面を遮らない
+            if (target !== 'menu') {
+                stopRestTimer();
+            }
+
             // タブ切り替え時にグラフを再描画
             if (target === 'chart') {
                 renderCharts();

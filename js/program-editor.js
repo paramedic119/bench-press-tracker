@@ -188,6 +188,21 @@ function saveProgramEditor() {
         return;
     }
 
+    // mainLift と種目タイプの整合性ソフトチェック（ブロックせず確認）
+    const mismatchTypes = new Set();
+    weeks.forEach(w => w.days.forEach(d => d.exercises.forEach(e => {
+        if (!isTypeInLiftFamily(e.type, mainLift)) mismatchTypes.add(e.type);
+    })));
+    if (mismatchTypes.size > 0) {
+        const names = Array.from(mismatchTypes).map(t => EXERCISE_NAMES[t] || t).join('、');
+        const liftName = LIFT_NAMES[mainLift] || mainLift;
+        const ok = confirm(
+            `⚠️ メインリフト「${liftName}」と異なる系統の種目が含まれています:\n${names}\n\n` +
+            `この場合 ${liftName} のMAX重量を基準に %MAX が計算されるため、意図しない重量になる可能性があります。\n\n保存を続けますか？`
+        );
+        if (!ok) return;
+    }
+
     // 保存
     const customs = getCustomPrograms();
     const isEdit = !!_editingProgramId;
@@ -232,17 +247,29 @@ function deleteCustomProgram(id) {
     saveCustomPrograms(remaining);
     syncCustomProgramsIntoArray();
 
-    // 削除対象が選択中なら、最初のプログラムに切り替える
-    if (getSelectedProgramId() === id) {
-        if (PROGRAMS.length > 0) setSelectedProgramId(PROGRAMS[0].id);
+    // 削除対象が選択中なら、最初のプログラムに切り替えて
+    // そのプログラム用に保存済みの Week/Day があれば復元
+    if (getSelectedProgramId() === id && PROGRAMS.length > 0) {
+        const nextProg = PROGRAMS[0];
+        setSelectedProgramId(nextProg.id);
+        if (typeof refreshProgramSelect === 'function') refreshProgramSelect();
+        renderCustomProgramList();
+        if (typeof refreshMaxWeightUI === 'function') refreshMaxWeightUI();
+        updateWeekOptions();
+        // 切替先プログラム用の保存値があれば復元
+        const weekSelect = document.getElementById('week-select');
+        const daySelect = document.getElementById('day-select');
+        const savedWeek = _getData(`${LS_KEY_WEEK}_${nextProg.id}`);
+        if (savedWeek && weekSelect) weekSelect.value = savedWeek;
+        updateDayOptions();
+        const savedDay = _getData(`${LS_KEY_DAY}_${nextProg.id}`);
+        if (savedDay && daySelect) daySelect.value = savedDay;
+        renderMenu();
+    } else {
+        // 削除したが選択中ではない場合
+        if (typeof refreshProgramSelect === 'function') refreshProgramSelect();
+        renderCustomProgramList();
     }
-    if (typeof refreshProgramSelect === 'function') refreshProgramSelect();
-    renderCustomProgramList();
-
-    if (typeof refreshMaxWeightUI === 'function') refreshMaxWeightUI();
-    updateWeekOptions();
-    updateDayOptions();
-    renderMenu();
     showToast('🗑️ プログラムを削除しました');
 }
 

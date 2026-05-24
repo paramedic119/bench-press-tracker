@@ -49,6 +49,31 @@ const LIFT_SHORT = {
   deadlift: 'DEAD'
 };
 
+// メインリフトと同系統（同じMAXを基準にしてよい）種目のグループ。
+// プログラム編集時の整合性チェックに使用。
+const LIFT_FAMILY = {
+  bench_press: ['bench_press', 'narrow_bench_press', 'legs_up_bench_press', 'legs_up_narrow_bench_press'],
+  squat: ['squat', 'front_squat', 'pause_squat'],
+  deadlift: ['deadlift', 'sumo_deadlift', 'deficit_deadlift']
+};
+
+/**
+ * 種目タイプが指定リフトと同系統か判定
+ */
+function isTypeInLiftFamily(exerciseType, mainLift) {
+  const family = LIFT_FAMILY[mainLift];
+  return Array.isArray(family) && family.includes(exerciseType);
+}
+
+/**
+ * HTML 用文字列エスケープ（カスタム入力の表示時に使う）
+ */
+function escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  })[c]);
+}
+
 // トレーニングプログラム一覧
 const PROGRAMS = [
   {
