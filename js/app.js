@@ -507,6 +507,8 @@ function renderSettings() {
     // 履歴件数
     const rc = document.getElementById('record-count');
     if (rc) rc.textContent = `${getHistory().length}件`;
+    // アチーブメント一覧
+    if (typeof renderAchievements === 'function') renderAchievements();
 }
 
 /**
@@ -532,6 +534,7 @@ function resetAllData() {
 
     // 既知の全キーを削除
     const keys = [LS_KEY_MAX, LS_KEY_HISTORY, LS_KEY_PROGRAM, LS_KEY_REST_SEC];
+    if (typeof LS_KEY_ACHIEVEMENTS !== 'undefined') keys.push(LS_KEY_ACHIEVEMENTS);
     Object.keys(LIFT_NAMES).forEach(lift => {
         keys.push(_maxKeyForLift(lift));
     });
@@ -572,6 +575,8 @@ function _initApp() {
     renderHistory();
     checkMaxSuggestion();
     renderSettings();
+    // 初回ロード時にアチーブメントを遡及判定（トースト無し）
+    if (typeof checkAchievements === 'function') checkAchievements(false);
 }
 
 // --- アプリ起動 ---

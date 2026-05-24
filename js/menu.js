@@ -393,6 +393,9 @@ function saveWorkout() {
     // 推定1RM が現在MAXを超えていればサジェスト表示
     checkMaxSuggestion();
 
+    // 新規アチーブメント判定（保存トーストの後に出る）
+    if (typeof checkAchievements === 'function') checkAchievements(true);
+
     // 次のDayへ自動進行
     setTimeout(() => {
         advanceToNextDay(programId, weekNum, dayNum);
