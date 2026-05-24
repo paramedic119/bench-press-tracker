@@ -44,15 +44,26 @@ function renderCustomProgramList() {
 }
 
 /**
- * エディタを開く。programId 指定で既存プログラムを編集、未指定で新規作成。
- * @param {string} [programId]
+ * エディタを開く。
+ * @param {string|object} [programIdOrData] - 文字列なら既存カスタムプログラムのIDで編集モード、
+ *   オブジェクトなら新規作成だがそのデータでプリフィルする（ジェネレータから渡される想定）、
+ *   省略なら空の新規作成
  */
-function openProgramEditor(programId) {
+function openProgramEditor(programIdOrData) {
     const modal = document.getElementById('program-editor-modal');
     if (!modal) return;
 
-    _editingProgramId = programId || null;
-    const existing = programId ? getCustomPrograms().find(p => p.id === programId) : null;
+    let existing = null;
+    if (typeof programIdOrData === 'string') {
+        _editingProgramId = programIdOrData;
+        existing = getCustomPrograms().find(p => p.id === programIdOrData);
+    } else if (programIdOrData && typeof programIdOrData === 'object') {
+        // テンプレートデータ（生成器から）。IDは保存時に新規発行される
+        _editingProgramId = null;
+        existing = programIdOrData;
+    } else {
+        _editingProgramId = null;
+    }
 
     // 基本情報のセット
     document.getElementById('pe-name').value = existing?.name || '';
@@ -62,8 +73,8 @@ function openProgramEditor(programId) {
     // 種目セレクト用のオプション生成
     _refreshExerciseTypeOptions();
 
-    // タイトル更新
-    document.getElementById('program-editor-title').textContent = existing ? 'プログラム編集' : '新規プログラム作成';
+    // タイトル更新（編集時のみ「編集」表記、生成プリフィル/新規は「新規プログラム作成」）
+    document.getElementById('program-editor-title').textContent = _editingProgramId ? 'プログラム編集' : '新規プログラム作成';
 
     // Weeks 部分を構築
     const weeksContainer = document.getElementById('pe-weeks');

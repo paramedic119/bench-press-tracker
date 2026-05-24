@@ -175,7 +175,10 @@
         <div id="custom-program-list" class="custom-program-list">
           <!-- JSで動的に生成 -->
         </div>
-        <button class="btn-secondary" onclick="openProgramEditor()">➕ 新規作成</button>
+        <div class="cp-create-actions">
+          <button class="btn-secondary" onclick="openProgramEditor()">➕ 新規作成</button>
+          <button class="btn-secondary" onclick="openProgramGenerator()">🤖 履歴から生成</button>
+        </div>
       </div>
 
       <div class="settings-group">
@@ -253,6 +256,88 @@
     <button type="button" class="timer-btn timer-close" onclick="stopRestTimer()">×</button>
   </div>
 
+  <!-- プログラム生成器（履歴から自動生成） -->
+  <div id="program-generator-modal" class="modal" hidden>
+    <div class="modal-backdrop" onclick="closeProgramGenerator()"></div>
+    <div class="modal-sheet" role="dialog" aria-modal="true" aria-labelledby="program-generator-title">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <h2 id="program-generator-title">🤖 履歴から生成</h2>
+        <button type="button" class="modal-close" onclick="closeProgramGenerator()" aria-label="閉じる">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="pe-section">
+          <label for="pg-lift">メインリフト</label>
+          <select id="pg-lift" onchange="_pgOnLiftChange()">
+            <option value="bench_press">ベンチプレス</option>
+            <option value="squat">スクワット</option>
+            <option value="deadlift">デッドリフト</option>
+          </select>
+        </div>
+
+        <div class="pg-section-label">📊 過去12週の解析</div>
+        <div id="pg-analysis" class="pg-analysis"></div>
+
+        <div class="pg-section-label">プログラムスタイル</div>
+        <div class="pg-template-grid">
+          <label class="pg-template-card">
+            <input type="radio" name="pg-template" value="linear" onchange="_pgOnTemplateChange()">
+            <div class="pg-template-content">
+              <div class="pg-template-icon">📈</div>
+              <div class="pg-template-name">線形強化</div>
+              <div class="pg-template-desc">週ごとに +2.5% 漸増</div>
+            </div>
+          </label>
+          <label class="pg-template-card">
+            <input type="radio" name="pg-template" value="volume" onchange="_pgOnTemplateChange()">
+            <div class="pg-template-content">
+              <div class="pg-template-icon">🏋️</div>
+              <div class="pg-template-name">ボリューム</div>
+              <div class="pg-template-desc">セット多めで肥大重視</div>
+            </div>
+          </label>
+          <label class="pg-template-card">
+            <input type="radio" name="pg-template" value="peaking" onchange="_pgOnTemplateChange()">
+            <div class="pg-template-content">
+              <div class="pg-template-icon">🎯</div>
+              <div class="pg-template-name">ピーキング</div>
+              <div class="pg-template-desc">最終週で MAX 挑戦</div>
+            </div>
+          </label>
+        </div>
+
+        <div class="pg-controls-row">
+          <div class="pe-section pg-control-half">
+            <label for="pg-weeks">期間</label>
+            <select id="pg-weeks" onchange="_pgOnWeeksChange()">
+              <option value="3">3週</option>
+              <option value="4" selected>4週</option>
+              <option value="6">6週</option>
+              <option value="8">8週</option>
+            </select>
+          </div>
+          <div class="pe-section pg-control-half">
+            <label for="pg-frequency">週あたり</label>
+            <select id="pg-frequency" onchange="_pgOnFrequencyChange()">
+              <option value="1">週1回</option>
+              <option value="2">週2回</option>
+              <option value="3" selected>週3回</option>
+              <option value="4">週4回</option>
+              <option value="5">週5回</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="pg-section-label">プレビュー</div>
+        <div id="pg-preview" class="pg-preview"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeProgramGenerator()">キャンセル</button>
+        <button type="button" class="btn-primary" onclick="generateAndOpenEditor()">✨ 生成してエディタへ</button>
+      </div>
+    </div>
+  </div>
+
   <!-- カスタムプログラム エディタ（ボトムシート / 全画面） -->
   <div id="program-editor-modal" class="modal" hidden>
     <div class="modal-backdrop" onclick="closeProgramEditor()"></div>
@@ -320,6 +405,7 @@
   <script src="js/chart.js"></script>
   <script src="js/achievements.js"></script>
   <script src="js/program-editor.js"></script>
+  <script src="js/program-generator.js"></script>
 
 </body>
 
