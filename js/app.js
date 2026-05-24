@@ -298,8 +298,11 @@ function initMaxWeightInput() {
     refreshMaxWeightUI();
 
     input.addEventListener('change', () => {
-        const val = parseFloat(input.value);
-        if (!isNaN(val) && val > 0) {
+        const raw = parseFloat(input.value);
+        if (!isNaN(raw) && raw > 0) {
+            // ジムでは 2.5kg 刻みしかロードできないので必ずスナップ
+            const val = roundWeight(raw);
+            input.value = val;
             const lift = getCurrentLift();
             setMaxWeight(val, lift);
             renderMenu();

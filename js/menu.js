@@ -283,12 +283,30 @@ function renderMenu() {
             }
         });
     });
-    // 重量・回数の変化でも保存ボタン更新
+    // 重量・回数の変化で保存ボタン更新、フォーカス離脱時に 2.5kg/整数 にスナップ
     container.querySelectorAll('.stepper-value').forEach(el => {
         el.addEventListener('change', updateSaveButtonState);
         el.addEventListener('input', updateSaveButtonState);
+        el.addEventListener('blur', _snapStepperValue);
     });
 
+    updateSaveButtonState();
+}
+
+/**
+ * 直接キーボード入力された値を、ID 接頭辞に基づいてスナップ
+ * （w-N-N → 重量を 2.5kg 単位 / r-N-N → 回数を整数）
+ */
+function _snapStepperValue(e) {
+    const el = e.target;
+    if (!el || !el.id) return;
+    let val = parseFloat(el.value);
+    if (!Number.isFinite(val) || val < 0) val = 0;
+    if (el.id.startsWith('w-')) {
+        el.value = roundWeight(val);
+    } else if (el.id.startsWith('r-')) {
+        el.value = Math.max(0, Math.round(val));
+    }
     updateSaveButtonState();
 }
 
@@ -405,10 +423,14 @@ function saveWorkout() {
             }
             const wInput = document.getElementById(`w-${exIdx}-${s}`);
             const rInput = document.getElementById(`r-${exIdx}-${s}`);
-            const weight = parseFloat(wInput?.value || '0');
+            const rawWeight = parseFloat(wInput?.value || '0');
             const reps = parseInt(rInput?.value || '0', 10);
             // 0kg / 0回 のセットは無効として除外（ボリューム・推定1RM等の集計を歪めない）
-            if (!(weight > 0) || !(reps > 0)) continue;
+            if (!(rawWeight > 0) || !(reps > 0)) continue;
+            // blur をスキップしたまま保存した場合のためにここでも 2.5kg にスナップ
+            const weight = roundWeight(rawWeight);
+            // 表示も同期
+            if (wInput) wInput.value = weight;
             sets.push({ set: s, weight, reps });
             hasAnyCheckedSets = true;
         }
@@ -447,7 +469,9 @@ function saveWorkout() {
 }
 
 /**
- * ステッパーの値を増減させる
+ * ステッパーの値を増減させる。
+ * delta が整数なら回数として整数に、小数なら重量として 2.5kg 単位にスナップする
+ * （ジムでは 2.5kg 刻みでしかロードできないため）。
  * @param {string} inputId - 対象inputのID
  * @param {number} delta - 増減量
  * @param {number} min - 最小値
@@ -458,7 +482,13 @@ function adjustValue(inputId, delta, min = 0) {
     let val = parseFloat(input.value) || 0;
     val += delta;
     if (val < min) val = min;
-    // 浮動小数点誤差対策 (ex: 2.5の倍数など)
-    input.value = Math.round(val * 10) / 10;
+    if (Number.isInteger(delta)) {
+        // 回数: 整数に丸める
+        val = Math.round(val);
+    } else {
+        // 重量: 必ず 2.5kg 単位にスナップ
+        val = roundWeight(val);
+    }
+    input.value = val;
 }
 
