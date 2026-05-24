@@ -186,6 +186,10 @@ function initTabs() {
             if (target === 'progress') {
                 renderProgress();
             }
+            // 設定タブ切り替え時に最新値で描画
+            if (target === 'settings') {
+                renderSettings();
+            }
         });
     });
 }
@@ -213,16 +217,37 @@ function initMaxWeightInput() {
 // ==================================================
 
 const DEFAULT_REST_SEC = 180; // 3分
+const LS_KEY_REST_SEC = 'bp_rest_duration_sec';
 let _timerInterval = null;
 let _timerRemaining = 0;
 
 /**
- * 休憩タイマーを開始（既存タイマーはリセット）
- * @param {number} seconds
+ * 設定された休憩時間（秒）を取得
+ * @returns {number}
  */
-function startRestTimer(seconds = DEFAULT_REST_SEC) {
+function getRestDuration() {
+    const s = _getData(LS_KEY_REST_SEC);
+    const n = s ? parseInt(s, 10) : NaN;
+    return Number.isFinite(n) && n > 0 ? n : DEFAULT_REST_SEC;
+}
+
+/**
+ * 休憩時間を保存
+ * @param {number} sec
+ */
+function setRestDuration(sec) {
+    if (!Number.isFinite(sec) || sec <= 0) return;
+    _setData(LS_KEY_REST_SEC, String(sec));
+    showToast(`⏱ 休憩時間を ${sec}秒 に設定しました`, 2000);
+}
+
+/**
+ * 休憩タイマーを開始（既存タイマーはリセット）
+ * @param {number} [seconds] 省略時は設定値
+ */
+function startRestTimer(seconds) {
     stopRestTimer(false);
-    _timerRemaining = seconds;
+    _timerRemaining = (typeof seconds === 'number' && seconds > 0) ? seconds : getRestDuration();
     _renderRestTimer();
     _showRestTimer();
     _timerInterval = setInterval(() => {
@@ -417,6 +442,77 @@ function importData(event) {
     reader.readAsText(file);
 }
 
+// ==================================================
+// 設定タブ
+// ==================================================
+
+const APP_VERSION = '1.4.0';
+
+/**
+ * 設定タブを描画（タブ切替時 + 主要操作後に呼ぶ）
+ */
+function renderSettings() {
+    // 休憩時間の選択
+    const sel = document.getElementById('rest-duration-select');
+    if (sel) sel.value = String(getRestDuration());
+    // バージョン
+    const ver = document.getElementById('app-version');
+    if (ver) ver.textContent = APP_VERSION;
+    // 履歴件数
+    const rc = document.getElementById('record-count');
+    if (rc) rc.textContent = `${getHistory().length}件`;
+}
+
+/**
+ * 履歴のみ全削除（MAX重量や設定は残す）
+ */
+function resetHistory() {
+    if (!confirm('履歴をすべて削除します。\nこの操作は取り消せません。続けますか？')) return;
+    if (!confirm('本当に削除しますか？（最終確認）')) return;
+    setHistory([]);
+    renderHistory();
+    if (typeof renderCharts === 'function') renderCharts();
+    if (typeof checkMaxSuggestion === 'function') checkMaxSuggestion();
+    renderSettings();
+    showToast('🗑️ 履歴をすべて削除しました', 3000);
+}
+
+/**
+ * 全データリセット（MAX・履歴・選択・設定すべて）
+ */
+function resetAllData() {
+    if (!confirm('全データをリセットします。\nMAX重量・履歴・プログラム選択・休憩時間設定がすべて削除されます。続けますか？')) return;
+    if (!confirm('本当にリセットしますか？（最終確認）')) return;
+
+    // 既知の全キーを削除
+    const keys = [LS_KEY_MAX, LS_KEY_HISTORY, LS_KEY_PROGRAM, LS_KEY_REST_SEC];
+    PROGRAMS.forEach(p => {
+        keys.push(`${LS_KEY_WEEK}_${p.id}`);
+        keys.push(`${LS_KEY_DAY}_${p.id}`);
+    });
+
+    if (isGasEnv()) {
+        keys.forEach(k => { delete _dataCache[k]; });
+        _syncToServer();
+    } else {
+        keys.forEach(k => localStorage.removeItem(k));
+    }
+
+    // UI 再構築
+    const maxInput = document.getElementById('max-weight-input');
+    if (maxInput) maxInput.value = getMaxWeight();
+    const progSel = document.getElementById('program-select');
+    if (progSel) progSel.value = getSelectedProgramId();
+    updateWeekOptions();
+    updateDayOptions();
+    renderMenu();
+    renderHistory();
+    if (typeof renderCharts === 'function') renderCharts();
+    checkMaxSuggestion();
+    renderSettings();
+    showToast('💣 全データをリセットしました', 3000);
+}
+
 /**
  * アプリのUI初期化（データロード後に呼ばれる）
  */
@@ -427,6 +523,7 @@ function _initApp() {
     renderMenu();
     renderHistory();
     checkMaxSuggestion();
+    renderSettings();
 }
 
 // --- アプリ起動 ---

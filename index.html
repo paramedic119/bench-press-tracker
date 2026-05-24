@@ -53,6 +53,7 @@
         <button class="tab-btn" data-tab="progress">プログラム</button>
         <button class="tab-btn" data-tab="history">履歴</button>
         <button class="tab-btn" data-tab="chart">グラフ</button>
+        <button class="tab-btn" data-tab="settings">設定</button>
       </nav>
     </header>
 
@@ -117,13 +118,61 @@
           🗑️ 選択して削除
         </button>
       </div>
-      <div class="data-controls">
-        <button class="btn-secondary" onclick="exportData()">📥 エクスポート</button>
-        <button class="btn-secondary" onclick="document.getElementById('import-file').click()">📤 インポート</button>
-        <input type="file" id="import-file" accept=".json,application/json" style="display:none" onchange="importData(event)">
-      </div>
       <div id="history-list">
         <!-- JSで動的に生成 -->
+      </div>
+    </section>
+
+    <!-- タブコンテンツ: 設定 -->
+    <section id="tab-settings" class="tab-content">
+      <div class="section-title">App Settings</div>
+
+      <div class="settings-group">
+        <div class="settings-group-title">⏱ インターバルタイマー</div>
+        <div class="settings-row">
+          <label for="rest-duration-select">デフォルト休憩時間</label>
+          <select id="rest-duration-select" onchange="setRestDuration(parseInt(this.value, 10))">
+            <option value="60">1分</option>
+            <option value="90">1分30秒</option>
+            <option value="120">2分</option>
+            <option value="180" selected>3分</option>
+            <option value="240">4分</option>
+            <option value="300">5分</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <div class="settings-group-title">💾 データ管理</div>
+        <div class="settings-row settings-row-stack">
+          <p class="settings-help">履歴とMAX重量、選択中プログラムを JSON でバックアップ・復元できます。</p>
+          <div class="data-controls">
+            <button class="btn-secondary" onclick="exportData()">📥 エクスポート</button>
+            <button class="btn-secondary" onclick="document.getElementById('import-file').click()">📤 インポート</button>
+            <input type="file" id="import-file" accept=".json,application/json" style="display:none" onchange="importData(event)">
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-group settings-group-danger">
+        <div class="settings-group-title">⚠️ 危険操作</div>
+        <div class="settings-row settings-row-stack">
+          <p class="settings-help">操作は取り消せません。実行前に必ずエクスポートでバックアップを取ってください。</p>
+          <button class="btn-danger" onclick="resetHistory()">🗑️ 履歴をすべて削除</button>
+          <button class="btn-danger" onclick="resetAllData()">💣 全データをリセット</button>
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <div class="settings-group-title">ℹ️ アプリ情報</div>
+        <div class="settings-row">
+          <span>バージョン</span>
+          <span id="app-version" class="settings-value">—</span>
+        </div>
+        <div class="settings-row">
+          <span>履歴件数</span>
+          <span id="record-count" class="settings-value">—</span>
+        </div>
       </div>
     </section>
 
