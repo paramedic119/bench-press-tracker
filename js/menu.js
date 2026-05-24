@@ -145,6 +145,9 @@ function renderMenu() {
 
     renderTodaySummary(dayData, maxWeight);
 
+    // 前回実績ルックアップ用に履歴を1回だけ取得してキャッシュ
+    const historyCache = getHistory();
+
     if (!dayData) {
         container.innerHTML = `
       <div class="empty-state">
@@ -180,16 +183,22 @@ function renderMenu() {
         // セット行
         for (let s = 1; s <= ex.target_sets; s++) {
             const chkId = `chk-${exIdx}-${s}`;
+            const prev = getPreviousResult(programId, weekNum, dayNum, exIdx, ex.type, s, historyCache);
+            const prevHtml = prev
+                ? `<div class="set-prev">前回: ${prev.weight}kg × ${prev.reps}</div>`
+                : '';
+
             html += `<div class="set-row">`;
-            // 行全体（チェック〜目標）を <label> でくるみ、タップで切替
+            // 行全体（チェック〜目標）を <label> でくるみ、タップで切替。デフォルトは未チェック
             html += `  <label class="set-row-toggle" for="${chkId}">`;
-            html += `    <input type="checkbox" id="${chkId}" class="set-check-input" checked>`;
+            html += `    <input type="checkbox" id="${chkId}" class="set-check-input">`;
             html += `    <div class="set-number">${s}</div>`;
             html += `    <div class="set-target">`;
             html += `      <span class="weight-value">${targetWeight}kg</span> × <span class="reps-value">${ex.target_reps}回</span>`;
             if (ex.rpe_target) {
                 html += ` <small class="rpe-target">@${ex.rpe_target}</small>`;
             }
+            html += prevHtml;
             html += `    </div>`;
             html += `  </label>`;
             html += `  <div class="set-inputs">`;
@@ -220,12 +229,32 @@ function renderMenu() {
 
     container.innerHTML = html;
 
-    // セット数・重量・回数の変化で保存ボタン状態を更新
-    container.querySelectorAll('.set-check-input, .stepper-value').forEach(el => {
+    // チェック切替: 保存ボタン更新 + 新規チェック時にインターバルタイマー起動
+    container.querySelectorAll('.set-check-input').forEach(cb => {
+        cb.addEventListener('change', (e) => {
+            updateSaveButtonState();
+            if (e.target.checked) {
+                startRestTimer();
+            }
+        });
+    });
+    // 重量・回数の変化でも保存ボタン更新
+    container.querySelectorAll('.stepper-value').forEach(el => {
         el.addEventListener('change', updateSaveButtonState);
         el.addEventListener('input', updateSaveButtonState);
     });
 
+    updateSaveButtonState();
+}
+
+/**
+ * 全セットのチェック状態を一括切替（全完了 ⇔ 全解除）
+ */
+function toggleAllSets() {
+    const checkboxes = document.querySelectorAll('.set-check-input');
+    if (checkboxes.length === 0) return;
+    const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+    checkboxes.forEach(cb => { cb.checked = !allChecked; });
     updateSaveButtonState();
 }
 
@@ -340,6 +369,7 @@ function saveWorkout() {
             record.exercises.push({
                 type: ex.type,
                 name: EXERCISE_NAMES[ex.type] || ex.type,
+                exIdx: exIdx,
                 sets: sets
             });
         }
@@ -356,6 +386,9 @@ function saveWorkout() {
     setHistory(history);
 
     showToast('✅ 実績を保存しました！');
+
+    // 推定1RM が現在MAXを超えていればサジェスト表示
+    checkMaxSuggestion();
 
     // 次のDayへ自動進行
     setTimeout(() => {

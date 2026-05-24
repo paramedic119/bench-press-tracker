@@ -208,6 +208,130 @@ function initMaxWeightInput() {
     });
 }
 
+// ==================================================
+// インターバルタイマー（休憩時間カウントダウン）
+// ==================================================
+
+const DEFAULT_REST_SEC = 180; // 3分
+let _timerInterval = null;
+let _timerRemaining = 0;
+
+/**
+ * 休憩タイマーを開始（既存タイマーはリセット）
+ * @param {number} seconds
+ */
+function startRestTimer(seconds = DEFAULT_REST_SEC) {
+    stopRestTimer(false);
+    _timerRemaining = seconds;
+    _renderRestTimer();
+    _showRestTimer();
+    _timerInterval = setInterval(() => {
+        _timerRemaining--;
+        if (_timerRemaining <= 0) {
+            _onRestTimerComplete();
+        } else {
+            _renderRestTimer();
+        }
+    }, 1000);
+}
+
+/**
+ * タイマー停止 + 非表示
+ * @param {boolean} hide
+ */
+function stopRestTimer(hide = true) {
+    if (_timerInterval) {
+        clearInterval(_timerInterval);
+        _timerInterval = null;
+    }
+    if (hide) _hideRestTimer();
+}
+
+/**
+ * タイマーに秒数を加減算
+ * @param {number} delta
+ */
+function adjustRestTimer(delta) {
+    _timerRemaining = Math.max(0, _timerRemaining + delta);
+    _renderRestTimer();
+}
+
+function _renderRestTimer() {
+    const display = document.getElementById('rest-timer-display');
+    if (!display) return;
+    const min = Math.floor(_timerRemaining / 60);
+    const sec = _timerRemaining % 60;
+    display.textContent = `${min}:${String(sec).padStart(2, '0')}`;
+}
+
+function _showRestTimer() {
+    const el = document.getElementById('rest-timer');
+    if (el) el.classList.add('show');
+}
+
+function _hideRestTimer() {
+    const el = document.getElementById('rest-timer');
+    if (el) el.classList.remove('show');
+}
+
+function _onRestTimerComplete() {
+    stopRestTimer();
+    if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+    showToast('⏱ 休憩終了！次のセットへ', 3500);
+}
+
+// ==================================================
+// MAX更新サジェスト（履歴の推定1RMが現在MAXを上回ったら提案）
+// ==================================================
+
+/**
+ * 履歴を走査し、最大推定1RMが現在のMAXを上回っていればサジェスト表示
+ */
+function checkMaxSuggestion() {
+    const el = document.getElementById('max-suggestion');
+    if (!el) return;
+
+    const currentMax = getMaxWeight();
+    const history = getHistory();
+    let best = 0;
+    history.forEach(rec => {
+        rec.exercises.forEach(ex => {
+            // ベンチプレス系統のみ 1RM 推定に使う（足上げ・ナローは除外）
+            if (ex.type !== 'bench_press') return;
+            ex.sets.forEach(s => {
+                const est = estimateMax(s.weight, s.reps);
+                if (est > best) best = est;
+            });
+        });
+    });
+
+    const suggested = roundWeight(best);
+    if (suggested > currentMax) {
+        el.hidden = false;
+        el.innerHTML = `
+          <button class="max-suggest-btn" onclick="applyMaxSuggestion(${suggested})">
+            🆙 推定1RM ${suggested}kg — MAX を更新
+          </button>
+        `;
+    } else {
+        el.hidden = true;
+        el.innerHTML = '';
+    }
+}
+
+/**
+ * サジェストされたMAXを採用してメニューを再計算
+ * @param {number} newMax
+ */
+function applyMaxSuggestion(newMax) {
+    setMaxWeight(newMax);
+    const input = document.getElementById('max-weight-input');
+    if (input) input.value = newMax;
+    checkMaxSuggestion();
+    renderMenu();
+    showToast(`💪 MAX重量を ${newMax}kg に更新しました`);
+}
+
 /**
  * アプリのUI初期化（データロード後に呼ばれる）
  */
@@ -217,6 +341,7 @@ function _initApp() {
     initSelectors();
     renderMenu();
     renderHistory();
+    checkMaxSuggestion();
 }
 
 // --- アプリ起動 ---

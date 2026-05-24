@@ -86,6 +86,37 @@ function updateDeleteBtnState() {
     }
 }
 
+/**
+ * 同じプログラム/週/日の直近履歴から、指定セットの実績を取得する。
+ * exIdx は同一Day内で同種目が複数回登場するケース（例: URPEST2 W3D1 の bench_press × 4）
+ * を区別するために使用。古いレコード（exIdx 未保存）は種目型のみで一致判定。
+ *
+ * @param {string} programId
+ * @param {number} weekNum
+ * @param {number} dayNum
+ * @param {number} exIdx
+ * @param {string} exerciseType
+ * @param {number} setNum
+ * @returns {{weight: number, reps: number}|null}
+ */
+function getPreviousResult(programId, weekNum, dayNum, exIdx, exerciseType, setNum, historyCache = null) {
+    const history = historyCache || getHistory(); // 新しい順
+    for (const rec of history) {
+        if (rec.programId !== programId) continue;
+        if (rec.week !== weekNum || rec.day !== dayNum) continue;
+
+        // 同じ exIdx + type のエクササイズを優先一致
+        let recEx = rec.exercises.find(e => e.exIdx === exIdx && e.type === exerciseType);
+        // フォールバック: exIdx 未保存の古いレコードは型のみで一致
+        if (!recEx) recEx = rec.exercises.find(e => !('exIdx' in e) && e.type === exerciseType);
+        if (!recEx) continue;
+
+        const set = recEx.sets.find(s => s.set === setNum);
+        if (set) return { weight: set.weight, reps: set.reps };
+    }
+    return null;
+}
+
 function deleteSelected() {
     const cbs = document.querySelectorAll('#history-list .history-checkbox:checked');
     if (cbs.length === 0) { showToast('削除する履歴を選択してください'); return; }

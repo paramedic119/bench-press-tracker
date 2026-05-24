@@ -44,6 +44,9 @@
         <span class="unit">kg</span>
       </div>
 
+      <!-- MAX更新サジェスト -->
+      <div id="max-suggestion" class="max-suggestion" hidden></div>
+
       <!-- タブナビゲーション -->
       <nav class="tab-nav">
         <button class="tab-btn active" data-tab="menu">メニュー</button>
@@ -82,7 +85,10 @@
         <!-- JSで動的に生成: セット数 / レップ / 推定総負荷 -->
       </div>
 
-      <div class="section-title">Training Menu</div>
+      <div class="menu-header-row">
+        <div class="section-title">Training Menu</div>
+        <button class="bulk-toggle-btn" onclick="toggleAllSets()">✓ 全完了 / 解除</button>
+      </div>
       <div id="menu-container">
         <!-- JSで動的に生成 -->
       </div>
@@ -144,6 +150,15 @@
         </div>
       </div>
     </section>
+  </div>
+
+  <!-- インターバルタイマー -->
+  <div id="rest-timer" class="rest-timer">
+    <span class="timer-icon">⏱</span>
+    <span id="rest-timer-display" class="timer-display">3:00</span>
+    <button type="button" class="timer-btn" onclick="adjustRestTimer(-30)">-30</button>
+    <button type="button" class="timer-btn" onclick="adjustRestTimer(30)">+30</button>
+    <button type="button" class="timer-btn timer-close" onclick="stopRestTimer()">×</button>
   </div>
 
   <!-- トースト通知 -->
