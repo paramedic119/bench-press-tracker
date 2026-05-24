@@ -37,6 +37,9 @@ function _filterHistoryByPeriod(history) {
  * グラフを描画・更新
  */
 function renderCharts() {
+    // Chart.js が CDN から読み込めなかった場合（オフライン等）はヒートマップだけ描画
+    const chartLibLoaded = typeof Chart !== 'undefined';
+
     const allHistory = getHistory().reverse(); // 時系列にするため反転
     const history = _filterHistoryByPeriod(allHistory);
     const chartSection = document.getElementById('chart-section');
@@ -108,6 +111,12 @@ function renderCharts() {
         });
         return total;
     });
+
+    // Chart.js 未ロード時は折れ線/棒グラフをスキップ（ヒートマップは描画済）
+    if (!chartLibLoaded) {
+        console.warn('Chart.js が読み込まれていません。推移グラフをスキップします。');
+        return;
+    }
 
     // 推定MAX推移グラフ
     const ctxMax = document.getElementById('maxWeightChart')?.getContext('2d');

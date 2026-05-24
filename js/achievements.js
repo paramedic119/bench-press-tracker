@@ -22,24 +22,27 @@ function _getEstMaxByLift(history, lift) {
 }
 
 /**
- * 各レコードを年+ISO週でグループ化し、最大セッション数を返す
+ * 各レコードを ISO 週でグループ化し、最大セッション数を返す。
+ * ISO 週年は「その週の木曜日が属する年」と定義されるため、
+ * 単純な d.getFullYear() ではなく木曜日（firstThu）の年を採用する。
  */
 function _maxSessionsInAnyWeek(history) {
     const counts = {};
     history.forEach(rec => {
         const d = new Date(rec.date);
-        // ISO 週番号
+        // d をローカル日付として UTC 0:00 に正規化
         const tmp = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
-        const dayNum = (tmp.getUTCDay() + 6) % 7;
-        tmp.setUTCDate(tmp.getUTCDate() - dayNum + 3);
+        const dayNum = (tmp.getUTCDay() + 6) % 7; // 0=月 ... 6=日
+        tmp.setUTCDate(tmp.getUTCDate() - dayNum + 3); // 当該週の木曜日
         const firstThu = tmp.getTime();
+        const isoYear = tmp.getUTCFullYear(); // ISO週年は木曜の年
+        // その年の最初の木曜日を求める
         tmp.setUTCMonth(0, 1);
         if (tmp.getUTCDay() !== 4) {
             tmp.setUTCMonth(0, 1 + ((4 - tmp.getUTCDay()) + 7) % 7);
         }
         const week = 1 + Math.round((firstThu - tmp.getTime()) / (7 * 24 * 60 * 60 * 1000));
-        const year = d.getUTCFullYear();
-        const key = `${year}-W${week}`;
+        const key = `${isoYear}-W${week}`;
         counts[key] = (counts[key] || 0) + 1;
     });
     return Math.max(0, ...Object.values(counts));
@@ -139,14 +142,13 @@ function checkAchievements(announce = true) {
 }
 
 /**
- * 新規アンロックを順次トーストで表示（800ms 間隔）
+ * 新規アンロックを順次トーストで表示。トーストキュー側で順番に出してくれるので
+ * ここでは即時 enqueue する。バイブは最初の1回のみ。
  */
 function _announceAchievements(achievements) {
-    achievements.forEach((ach, i) => {
-        setTimeout(() => {
-            showToast(`${ach.icon} 達成解除: ${ach.title}`, 3500);
-            if (navigator.vibrate) navigator.vibrate(80);
-        }, 1500 + i * 900);
+    if (achievements.length > 0 && navigator.vibrate) navigator.vibrate(80);
+    achievements.forEach(ach => {
+        showToast(`${ach.icon} 達成解除: ${ach.title}`, 2800);
     });
 }
 

@@ -171,18 +171,40 @@ function setSelectedProgramId(id) {
     _setData(LS_KEY_PROGRAM, id);
 }
 
+// --- トースト通知（キュー方式で連発時の上書きを防止） ---
+const _toastQueue = [];
+let _toastShowing = false;
+const _TOAST_TRANSITION_MS = 350;
+
 /**
- * トースト通知を表示
- * @param {string} message - 表示メッセージ
- * @param {number} duration - 表示時間(ms)
+ * トースト通知を表示。複数連続して呼ばれた場合はキューに積まれて順次表示される。
+ * @param {string} message
+ * @param {number} duration
  */
 function showToast(message, duration = 2500) {
+    _toastQueue.push({ message, duration });
+    if (!_toastShowing) _processToastQueue();
+}
+
+function _processToastQueue() {
+    if (_toastQueue.length === 0) {
+        _toastShowing = false;
+        return;
+    }
+    _toastShowing = true;
+    const { message, duration } = _toastQueue.shift();
     const toast = document.getElementById('toast');
-    if (!toast) return;
+    if (!toast) {
+        // DOM 未準備の場合は次へ
+        _processToastQueue();
+        return;
+    }
     toast.textContent = message;
     toast.classList.add('show');
     setTimeout(() => {
         toast.classList.remove('show');
+        // スライドアウトのトランジション完了を待ってから次を表示
+        setTimeout(_processToastQueue, _TOAST_TRANSITION_MS);
     }, duration);
 }
 
@@ -409,17 +431,28 @@ function applyMaxSuggestion(newMax) {
 // GAS 同期失敗時の保険・機種変更時の引っ越し用
 // ==================================================
 
-const EXPORT_VERSION = 1;
+const EXPORT_VERSION = 2; // v2: 全リフトMAX・休憩設定・アチーブメント対応
 
 /**
- * 現在の MAX・履歴・選択中プログラムを JSON でダウンロード
+ * 全データ（履歴・全リフトMAX・選択中プログラム・休憩設定・アチーブメント）を
+ * JSON でダウンロード
  */
 function exportData() {
+    const maxWeights = {};
+    Object.keys(LIFT_NAMES).forEach(lift => {
+        maxWeights[lift] = getMaxWeight(lift);
+    });
     const payload = {
         version: EXPORT_VERSION,
         exportedAt: new Date().toISOString(),
-        maxWeight: getMaxWeight(),
+        maxWeights: maxWeights,
+        // 旧形式リーダー向けに bench_press の値も同梱
+        maxWeight: maxWeights.bench_press,
         selectedProgram: getSelectedProgramId(),
+        restDuration: getRestDuration(),
+        unlockedAchievements: Array.from(
+            typeof getUnlockedAchievements === 'function' ? getUnlockedAchievements() : []
+        ),
         history: getHistory()
     };
     const json = JSON.stringify(payload, null, 2);
@@ -456,11 +489,25 @@ function importData(event) {
                 return;
             }
 
-            if (typeof data.maxWeight === 'number' && data.maxWeight > 0) {
-                setMaxWeight(data.maxWeight);
+            // 新形式 (v2): maxWeights オブジェクトでリフト別に復元
+            if (data.maxWeights && typeof data.maxWeights === 'object') {
+                Object.entries(data.maxWeights).forEach(([lift, w]) => {
+                    if (typeof w === 'number' && w > 0 && LIFT_NAMES[lift]) {
+                        setMaxWeight(w, lift);
+                    }
+                });
+            } else if (typeof data.maxWeight === 'number' && data.maxWeight > 0) {
+                // 旧形式 (v1): 単一maxWeight は bench_press として扱う
+                setMaxWeight(data.maxWeight, 'bench_press');
             }
             if (typeof data.selectedProgram === 'string') {
                 setSelectedProgramId(data.selectedProgram);
+            }
+            if (typeof data.restDuration === 'number' && data.restDuration > 0) {
+                _setData(LS_KEY_REST_SEC, String(data.restDuration));
+            }
+            if (Array.isArray(data.unlockedAchievements) && typeof setUnlockedAchievements === 'function') {
+                setUnlockedAchievements(new Set(data.unlockedAchievements));
             }
             setHistory(data.history);
 
@@ -473,6 +520,8 @@ function importData(event) {
             renderMenu();
             renderHistory();
             checkMaxSuggestion();
+            if (typeof checkAchievements === 'function') checkAchievements(false); // 静かに遡及判定
+            renderSettings();
             showToast(`✅ ${count}件をインポートしました`, 3000);
         } catch (err) {
             console.error('インポートエラー:', err);

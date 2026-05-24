@@ -365,6 +365,8 @@ function saveWorkout() {
             const rInput = document.getElementById(`r-${exIdx}-${s}`);
             const weight = parseFloat(wInput?.value || '0');
             const reps = parseInt(rInput?.value || '0', 10);
+            // 0kg / 0回 のセットは無効として除外（ボリューム・推定1RM等の集計を歪めない）
+            if (!(weight > 0) || !(reps > 0)) continue;
             sets.push({ set: s, weight, reps });
             hasAnyCheckedSets = true;
         }

@@ -212,6 +212,9 @@ function navigateToDay(programId, weekNum, dayNum) {
         daySelect.value = dayNum;
         _setData(`${LS_KEY_DAY}_${programId}`, String(dayNum));
     }
+    // 別リフトのプログラムへ遷移した場合に MAX ラベルと値を更新
+    if (typeof refreshMaxWeightUI === 'function') refreshMaxWeightUI();
+    if (typeof checkMaxSuggestion === 'function') checkMaxSuggestion();
     renderMenu();
 
     // メニュータブに切り替え
