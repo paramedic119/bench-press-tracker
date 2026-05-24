@@ -94,20 +94,47 @@ function _flushSyncNow() {
 // --- 公開API（既存インターフェース維持） ---
 
 /**
- * MAX重量を取得（デフォルト100kg）
+ * 指定リフトの保存キーを返す
+ * @param {string} lift
+ * @returns {string}
+ */
+function _maxKeyForLift(lift) {
+    return `${LS_KEY_MAX}_${lift}`;
+}
+
+/**
+ * 現在選択中プログラムの主種目を取得
+ * @returns {string} 'bench_press' | 'squat' | 'deadlift'
+ */
+function getCurrentLift() {
+    const prog = getProgramById(getSelectedProgramId());
+    return (prog && prog.mainLift) || 'bench_press';
+}
+
+/**
+ * 指定リフト（省略時は現在のプログラムの主種目）のMAXを取得。
+ * デフォルト100kg。bench_press は旧キー `bp_max_weight` からも読み取り後方互換。
+ * @param {string} [lift]
  * @returns {number}
  */
-function getMaxWeight() {
-    const stored = _getData(LS_KEY_MAX);
+function getMaxWeight(lift) {
+    const targetLift = lift || getCurrentLift();
+    let stored = _getData(_maxKeyForLift(targetLift));
+    // 後方互換: bench_press はリフト別キーが無ければ旧キーを試す
+    if (stored === null && targetLift === 'bench_press') {
+        stored = _getData(LS_KEY_MAX);
+    }
     return stored ? parseFloat(stored) : 100;
 }
 
 /**
- * MAX重量を保存
+ * 指定リフト（省略時は現在のプログラムの主種目）のMAXを保存
  * @param {number} weight
+ * @param {string} [lift]
  */
-function setMaxWeight(weight) {
-    _setData(LS_KEY_MAX, String(weight));
+function setMaxWeight(weight, lift) {
+    const targetLift = lift || getCurrentLift();
+    _setData(_maxKeyForLift(targetLift), String(weight));
 }
 
 /**
@@ -199,17 +226,33 @@ function initMaxWeightInput() {
     const input = document.getElementById('max-weight-input');
     if (!input) return;
 
-    input.value = getMaxWeight();
+    refreshMaxWeightUI();
 
     input.addEventListener('change', () => {
         const val = parseFloat(input.value);
         if (!isNaN(val) && val > 0) {
-            setMaxWeight(val);
-            // メニュー再描画
+            const lift = getCurrentLift();
+            setMaxWeight(val, lift);
             renderMenu();
-            showToast(`MAX重量を ${val}kg に更新しました`);
+            const liftName = LIFT_NAMES[lift] || lift;
+            showToast(`${liftName} MAX を ${val}kg に更新しました`);
+            checkMaxSuggestion();
         }
     });
+}
+
+/**
+ * MAXラベルと入力値を現在のリフトに合わせて更新。
+ * プログラム切替時にも呼ぶ。
+ */
+function refreshMaxWeightUI() {
+    const input = document.getElementById('max-weight-input');
+    const label = document.getElementById('max-weight-label');
+    if (input) input.value = getMaxWeight();
+    if (label) {
+        const lift = getCurrentLift();
+        label.textContent = `${LIFT_SHORT[lift] || 'CURRENT'} MAX`;
+    }
 }
 
 // ==================================================
@@ -310,19 +353,20 @@ function _onRestTimerComplete() {
 // ==================================================
 
 /**
- * 履歴を走査し、最大推定1RMが現在のMAXを上回っていればサジェスト表示
+ * 履歴を走査し、現在リフトの最大推定1RMが現在MAXを上回っていればサジェスト表示
  */
 function checkMaxSuggestion() {
     const el = document.getElementById('max-suggestion');
     if (!el) return;
 
-    const currentMax = getMaxWeight();
+    const lift = getCurrentLift();
+    const currentMax = getMaxWeight(lift);
     const history = getHistory();
     let best = 0;
     history.forEach(rec => {
         rec.exercises.forEach(ex => {
-            // ベンチプレス系統のみ 1RM 推定に使う（足上げ・ナローは除外）
-            if (ex.type !== 'bench_press') return;
+            // 現在リフトのメイン種目のみで推定（ナロー・ポーズ等の補助種目は除外）
+            if (ex.type !== lift) return;
             ex.sets.forEach(s => {
                 const est = estimateMax(s.weight, s.reps);
                 if (est > best) best = est;
@@ -332,10 +376,11 @@ function checkMaxSuggestion() {
 
     const suggested = roundWeight(best);
     if (suggested > currentMax) {
+        const liftName = LIFT_NAMES[lift] || lift;
         el.hidden = false;
         el.innerHTML = `
           <button class="max-suggest-btn" onclick="applyMaxSuggestion(${suggested})">
-            🆙 推定1RM ${suggested}kg — MAX を更新
+            🆙 ${liftName}推定1RM ${suggested}kg — MAX を更新
           </button>
         `;
     } else {
@@ -345,16 +390,18 @@ function checkMaxSuggestion() {
 }
 
 /**
- * サジェストされたMAXを採用してメニューを再計算
+ * サジェストされたMAXを現在リフトに対して採用してメニューを再計算
  * @param {number} newMax
  */
 function applyMaxSuggestion(newMax) {
-    setMaxWeight(newMax);
+    const lift = getCurrentLift();
+    setMaxWeight(newMax, lift);
     const input = document.getElementById('max-weight-input');
     if (input) input.value = newMax;
     checkMaxSuggestion();
     renderMenu();
-    showToast(`💪 MAX重量を ${newMax}kg に更新しました`);
+    const liftName = LIFT_NAMES[lift] || lift;
+    showToast(`💪 ${liftName} MAX を ${newMax}kg に更新しました`);
 }
 
 // ==================================================
@@ -418,12 +465,11 @@ function importData(event) {
             setHistory(data.history);
 
             // UI 全体を再構築
-            const maxInput = document.getElementById('max-weight-input');
-            if (maxInput) maxInput.value = getMaxWeight();
             const progSel = document.getElementById('program-select');
             if (progSel) progSel.value = getSelectedProgramId();
             updateWeekOptions();
             updateDayOptions();
+            refreshMaxWeightUI();
             renderMenu();
             renderHistory();
             checkMaxSuggestion();
@@ -486,6 +532,9 @@ function resetAllData() {
 
     // 既知の全キーを削除
     const keys = [LS_KEY_MAX, LS_KEY_HISTORY, LS_KEY_PROGRAM, LS_KEY_REST_SEC];
+    Object.keys(LIFT_NAMES).forEach(lift => {
+        keys.push(_maxKeyForLift(lift));
+    });
     PROGRAMS.forEach(p => {
         keys.push(`${LS_KEY_WEEK}_${p.id}`);
         keys.push(`${LS_KEY_DAY}_${p.id}`);
@@ -499,12 +548,11 @@ function resetAllData() {
     }
 
     // UI 再構築
-    const maxInput = document.getElementById('max-weight-input');
-    if (maxInput) maxInput.value = getMaxWeight();
     const progSel = document.getElementById('program-select');
     if (progSel) progSel.value = getSelectedProgramId();
     updateWeekOptions();
     updateDayOptions();
+    refreshMaxWeightUI();
     renderMenu();
     renderHistory();
     if (typeof renderCharts === 'function') renderCharts();

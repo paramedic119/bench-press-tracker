@@ -64,6 +64,9 @@ function initSelectors() {
             if (savedDay) daySelect.value = savedDay;
         }
 
+        // 主種目が変わるとMAXラベル・MAX値が変わるので更新
+        refreshMaxWeightUI();
+        checkMaxSuggestion();
         renderMenu();
     });
 
