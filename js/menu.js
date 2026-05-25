@@ -491,20 +491,3 @@ function adjustValue(inputId, delta, min = 0) {
     }
     input.value = val;
 }
-
-/**
- * セット行のスタイルをチェック状態に合わせて更新
- * @param {number} exIdx
- * @param {number} setNum
- */
-function toggleSetRowStyle(exIdx, setNum) {
-    const chk = document.getElementById(`chk-${exIdx}-${setNum}`);
-    const row = document.getElementById(`row-${exIdx}-${setNum}`);
-    if (chk && row) {
-        if (chk.checked) {
-            row.classList.add('checked');
-        } else {
-            row.classList.remove('checked');
-        }
-    }
-}
