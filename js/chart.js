@@ -44,15 +44,18 @@ function renderCharts() {
     const history = _filterHistoryByPeriod(allHistory);
     const chartSection = document.getElementById('chart-section');
     const emptyState = document.getElementById('chart-empty');
+    const prSection = document.getElementById('pr-section');
 
     if (allHistory.length === 0) {
         if (chartSection) chartSection.style.display = 'none';
         if (emptyState) emptyState.style.display = 'flex';
+        if (prSection) prSection.style.display = 'none';
         return;
     }
 
     if (chartSection) chartSection.style.display = 'block';
     if (emptyState) emptyState.style.display = 'none';
+    if (prSection) prSection.style.display = 'block';
 
     // ヒートマップは全履歴ベースで描画（期間フィルタの影響を受けない）
     renderHeatmap(allHistory);
@@ -68,15 +71,83 @@ function renderCharts() {
     // データ抽出
     const labels = history.map(rec => formatDate(new Date(rec.date)));
 
-    // 推定MAX推移 (各セッションの最高挙上重量から換算)
+    let max1RM = 0;
+    let max3RM = 0;
+    let max5RM = 0;
+    let date1RM = '-';
+    let date3RM = '-';
+    let date5RM = '-';
+
+    const act1RMData = [];
+    const act3RMData = [];
+    const act5RMData = [];
+
+    // 推定MAX推移 (各セッションの最高挙上重量から換算) 及び PR計算
     const estimatedMaxData = history.map(rec => {
         let sessionBestMax = 0;
+        let sessionAct1RM = null;
+        let sessionAct3RM = null;
+        let sessionAct5RM = null;
+
+        const dateStr = formatDate(new Date(rec.date));
+
         rec.exercises.forEach(ex => {
+            // PRの記録はベンチプレスのみが対象
+            if (ex.type === 'bench_press') {
+                ex.sets.forEach(s => {
+                    // 実測1RM更新チェック
+                    if (s.reps === 1) {
+                        if (sessionAct1RM === null || s.weight > sessionAct1RM) sessionAct1RM = s.weight;
+                        if (s.weight > max1RM) {
+                            max1RM = s.weight;
+                            date1RM = dateStr;
+                        }
+                    }
+                    // 実測3RM更新チェック
+                    if (s.reps === 3) {
+                        if (sessionAct3RM === null || s.weight > sessionAct3RM) sessionAct3RM = s.weight;
+                        if (s.weight > max3RM) {
+                            max3RM = s.weight;
+                            date3RM = dateStr;
+                        }
+                    }
+                    // 実測5RM更新チェック
+                    if (s.reps === 5) {
+                        if (sessionAct5RM === null || s.weight > sessionAct5RM) sessionAct5RM = s.weight;
+                        if (s.weight > max5RM) {
+                            max5RM = s.weight;
+                            date5RM = dateStr;
+                        }
+                    }
+                });
+            }
+
+            // 既存の推定MAX計算
             ex.sets.forEach(s => {
                 const est = estimateMax(s.weight, s.reps);
                 if (est > sessionBestMax) sessionBestMax = est;
             });
         });
+
+        // 自己ベスト更新（またはタイ記録）時のみプロットする
+        if (sessionAct1RM !== null && sessionAct1RM >= max1RM) {
+            act1RMData.push(sessionAct1RM);
+        } else {
+            act1RMData.push(null);
+        }
+
+        if (sessionAct3RM !== null && sessionAct3RM >= max3RM) {
+            act3RMData.push(sessionAct3RM);
+        } else {
+            act3RMData.push(null);
+        }
+
+        if (sessionAct5RM !== null && sessionAct5RM >= max5RM) {
+            act5RMData.push(sessionAct5RM);
+        } else {
+            act5RMData.push(null);
+        }
+
         return sessionBestMax;
     });
 
@@ -144,7 +215,7 @@ function renderCharts() {
                     fill: true
                 }]
             },
-            options: getChartOptions('推定1RM推移')
+            options: getChartOptions('推定/実測1RM推移', true)
         });
     }
 
@@ -157,13 +228,13 @@ function renderCharts() {
             data: {
                 labels: labels,
                 datasets: [{
-                    label: '総負荷量 (kg)',
+                    label: '総負荷量(kg)',
                     data: volumeData,
                     backgroundColor: 'rgba(91, 141, 239, 0.6)',
                     borderRadius: 4
                 }]
             },
-            options: getChartOptions('トレーニングボリューム')
+            options: getChartOptions('トレーニングボリューム', false)
         });
     }
 }
@@ -305,14 +376,20 @@ function _heatmapLevel(v, p90) {
 /**
  * Chart.js 共通オプション
  * @param {string} title
+ * @param {boolean} showLegend
  */
-function getChartOptions(title) {
+function getChartOptions(title, showLegend = false) {
     return {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
             legend: {
-                display: false
+                display: showLegend,
+                labels: {
+                    color: '#9ba1b8',
+                    font: { size: 10 },
+                    boxWidth: 12
+                }
             },
             tooltip: {
                 mode: 'index',

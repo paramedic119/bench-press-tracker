@@ -414,11 +414,14 @@ body {
 }
 
 .rpe-target {
-  font-size: 0.65rem;
-  color: var(--text-muted);
-  margin-left: 2px;
-  font-weight: 600;
-  vertical-align: top;
+  font-size: 0.75rem;
+  color: var(--accent-gold);
+  margin-left: 4px;
+  font-weight: 700;
+  vertical-align: middle;
+  background: rgba(255, 198, 39, 0.1);
+  padding: 1px 4px;
+  border-radius: 4px;
 }
 
 .set-number {
