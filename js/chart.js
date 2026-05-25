@@ -172,6 +172,20 @@ function renderCharts() {
     });
     const prFlags = history.map(rec => prDates.has(rec.date));
 
+    // 実測 PR (1RM/3RM/5RM) を DOM に反映（main から取り込み）
+    if (document.getElementById('pr-1rm-val')) {
+        document.getElementById('pr-1rm-val').textContent = max1RM > 0 ? max1RM : '-';
+        document.getElementById('pr-1rm-date').textContent = date1RM;
+    }
+    if (document.getElementById('pr-3rm-val')) {
+        document.getElementById('pr-3rm-val').textContent = max3RM > 0 ? max3RM : '-';
+        document.getElementById('pr-3rm-date').textContent = date3RM;
+    }
+    if (document.getElementById('pr-5rm-val')) {
+        document.getElementById('pr-5rm-val').textContent = max5RM > 0 ? max5RM : '-';
+        document.getElementById('pr-5rm-date').textContent = date5RM;
+    }
+
     // トレーニングボリューム推移
     const volumeData = history.map(rec => {
         let total = 0;
@@ -199,21 +213,61 @@ function renderCharts() {
             type: 'line',
             data: {
                 labels: labels,
-                datasets: [{
-                    label: '推定1RM (kg)',
-                    data: estimatedMaxData,
-                    borderColor: '#f0c040',
-                    backgroundColor: 'rgba(240, 192, 64, 0.1)',
-                    borderWidth: 3,
-                    pointBackgroundColor: prFlags.map(isPR => isPR ? '#fffacd' : '#f0c040'),
-                    pointBorderColor: prFlags.map(isPR => isPR ? '#ffc627' : '#f0c040'),
-                    pointBorderWidth: prFlags.map(isPR => isPR ? 2 : 1),
-                    pointRadius: prFlags.map(isPR => isPR ? 7 : 4),
-                    pointHoverRadius: prFlags.map(isPR => isPR ? 9 : 6),
-                    pointStyle: prFlags.map(isPR => isPR ? 'star' : 'circle'),
-                    tension: 0.3,
-                    fill: true
-                }]
+                datasets: [
+                    {
+                        // 推定1RM (Epley) を背景塗りつぶし線で。PR 更新セッションを ⭐ で強調
+                        label: '推定1RM',
+                        data: estimatedMaxData,
+                        borderColor: '#f0c040',
+                        backgroundColor: 'rgba(240, 192, 64, 0.1)',
+                        borderWidth: 2,
+                        pointBackgroundColor: prFlags.map(isPR => isPR ? '#fffacd' : '#f0c040'),
+                        pointBorderColor: prFlags.map(isPR => isPR ? '#ffc627' : '#f0c040'),
+                        pointBorderWidth: prFlags.map(isPR => isPR ? 2 : 0),
+                        pointRadius: prFlags.map(isPR => isPR ? 6 : 2),
+                        pointHoverRadius: prFlags.map(isPR => isPR ? 8 : 4),
+                        pointStyle: prFlags.map(isPR => isPR ? 'star' : 'circle'),
+                        tension: 0.3,
+                        fill: true
+                    },
+                    {
+                        // 実測 1RM 自己ベスト更新セッションのみマーカー表示
+                        label: '実測1RM',
+                        data: act1RMData,
+                        borderColor: '#e2e8f0',
+                        backgroundColor: '#e2e8f0',
+                        borderWidth: 3,
+                        pointBackgroundColor: '#e2e8f0',
+                        pointRadius: 4,
+                        spanGaps: true,
+                        tension: 0,
+                        fill: false
+                    },
+                    {
+                        label: '実測3RM',
+                        data: act3RMData,
+                        borderColor: '#e67e22',
+                        backgroundColor: '#e67e22',
+                        borderWidth: 3,
+                        pointBackgroundColor: '#e67e22',
+                        pointRadius: 4,
+                        spanGaps: true,
+                        tension: 0,
+                        fill: false
+                    },
+                    {
+                        label: '実測5RM',
+                        data: act5RMData,
+                        borderColor: '#3b82f6',
+                        backgroundColor: '#3b82f6',
+                        borderWidth: 3,
+                        pointBackgroundColor: '#3b82f6',
+                        pointRadius: 4,
+                        spanGaps: true,
+                        tension: 0,
+                        fill: false
+                    }
+                ]
             },
             options: getChartOptions('推定/実測1RM推移', true)
         });
