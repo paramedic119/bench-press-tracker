@@ -4,10 +4,21 @@
 
 // 種目名の日本語変換辞書
 const EXERCISE_NAMES = {
+  // ベンチ系
   bench_press: 'ベンチプレス',
   narrow_bench_press: 'ナローベンチプレス',
   legs_up_bench_press: '足上げベンチプレス',
-  legs_up_narrow_bench_press: '足上げナローベンチプレス'
+  legs_up_narrow_bench_press: '足上げナローベンチプレス',
+  // スクワット系
+  squat: 'スクワット',
+  front_squat: 'フロントスクワット',
+  pause_squat: 'ポーズスクワット',
+  // デッドリフト系
+  deadlift: 'デッドリフト',
+  sumo_deadlift: 'スモウデッドリフト',
+  deficit_deadlift: 'デフィシットデッドリフト',
+  // その他
+  overhead_press: 'オーバーヘッドプレス'
 };
 
 // 種目アイコン
@@ -15,8 +26,53 @@ const EXERCISE_ICONS = {
   bench_press: '🏋️',
   narrow_bench_press: '💪',
   legs_up_bench_press: '🦵',
-  legs_up_narrow_bench_press: '🔥'
+  legs_up_narrow_bench_press: '🔥',
+  squat: '🦿',
+  front_squat: '🦵',
+  pause_squat: '⏸️',
+  deadlift: '🛢️',
+  sumo_deadlift: '🤼',
+  deficit_deadlift: '📏',
+  overhead_press: '🪖'
 };
+
+// メインリフト（プログラムが対象とする種目）
+const LIFT_NAMES = {
+  bench_press: 'ベンチプレス',
+  squat: 'スクワット',
+  deadlift: 'デッドリフト'
+};
+
+const LIFT_SHORT = {
+  bench_press: 'BENCH',
+  squat: 'SQUAT',
+  deadlift: 'DEAD'
+};
+
+// メインリフトと同系統（同じMAXを基準にしてよい）種目のグループ。
+// プログラム編集時の整合性チェックに使用。
+const LIFT_FAMILY = {
+  bench_press: ['bench_press', 'narrow_bench_press', 'legs_up_bench_press', 'legs_up_narrow_bench_press'],
+  squat: ['squat', 'front_squat', 'pause_squat'],
+  deadlift: ['deadlift', 'sumo_deadlift', 'deficit_deadlift']
+};
+
+/**
+ * 種目タイプが指定リフトと同系統か判定
+ */
+function isTypeInLiftFamily(exerciseType, mainLift) {
+  const family = LIFT_FAMILY[mainLift];
+  return Array.isArray(family) && family.includes(exerciseType);
+}
+
+/**
+ * HTML 用文字列エスケープ（カスタム入力の表示時に使う）
+ */
+function escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  })[c]);
+}
 
 // トレーニングプログラム一覧
 const PROGRAMS = [
@@ -24,6 +80,7 @@ const PROGRAMS = [
     id: 'bps_bench',
     name: 'BPSベンチプレスプログラム',
     description: '9週間の基礎強化プログラム',
+    mainLift: 'bench_press',
     weeks: [
       {
         week_number: 1,
@@ -296,6 +353,7 @@ const PROGRAMS = [
     id: 'urpest2_bench',
     name: 'URPEST2.0 6週間BPプログラム',
     description: 'RPEベースの6週間ベンチプレス強化プログラム（週3回）',
+    mainLift: 'bench_press',
     weeks: [
       {
         week_number: 1,
@@ -470,8 +528,94 @@ const PROGRAMS = [
         ]
       }
     ]
+  },
+  {
+    id: 'squat_5x5',
+    name: 'スクワット 5x5 ベーシック',
+    description: '4週間の基礎的な5x5線形プログラム',
+    mainLift: 'squat',
+    weeks: [
+      {
+        week_number: 1,
+        days: [
+          { day_number: 1, exercises: [{ type: 'squat', target_sets: 5, target_reps: 5, percentage_of_max: 70, is_amrap: false, rpe_target: null }] },
+          { day_number: 2, exercises: [{ type: 'squat', target_sets: 5, target_reps: 5, percentage_of_max: 72.5, is_amrap: false, rpe_target: null }] },
+          { day_number: 3, exercises: [{ type: 'pause_squat', target_sets: 4, target_reps: 5, percentage_of_max: 65, is_amrap: false, rpe_target: null }] }
+        ]
+      },
+      {
+        week_number: 2,
+        days: [
+          { day_number: 1, exercises: [{ type: 'squat', target_sets: 5, target_reps: 5, percentage_of_max: 75, is_amrap: false, rpe_target: null }] },
+          { day_number: 2, exercises: [{ type: 'squat', target_sets: 5, target_reps: 5, percentage_of_max: 77.5, is_amrap: false, rpe_target: null }] },
+          { day_number: 3, exercises: [{ type: 'pause_squat', target_sets: 4, target_reps: 5, percentage_of_max: 67.5, is_amrap: false, rpe_target: null }] }
+        ]
+      },
+      {
+        week_number: 3,
+        days: [
+          { day_number: 1, exercises: [{ type: 'squat', target_sets: 5, target_reps: 5, percentage_of_max: 80, is_amrap: false, rpe_target: null }] },
+          { day_number: 2, exercises: [{ type: 'squat', target_sets: 5, target_reps: 3, percentage_of_max: 85, is_amrap: false, rpe_target: null }] },
+          { day_number: 3, exercises: [{ type: 'front_squat', target_sets: 4, target_reps: 5, percentage_of_max: 60, is_amrap: false, rpe_target: null }] }
+        ]
+      },
+      {
+        week_number: 4,
+        days: [
+          { day_number: 1, exercises: [{ type: 'squat', target_sets: 3, target_reps: 3, percentage_of_max: 87.5, is_amrap: false, rpe_target: null }] },
+          { day_number: 2, exercises: [{ type: 'squat', target_sets: 1, target_reps: 1, percentage_of_max: 95, is_amrap: false, rpe_target: null }] }
+        ]
+      }
+    ]
+  },
+  {
+    id: 'deadlift_531',
+    name: 'デッドリフト 5/3/1 ライト',
+    description: '4週間サイクルの基礎デッドプログラム',
+    mainLift: 'deadlift',
+    weeks: [
+      {
+        week_number: 1,
+        days: [
+          { day_number: 1, exercises: [
+            { type: 'deadlift', target_sets: 1, target_reps: 5, percentage_of_max: 65, is_amrap: false, rpe_target: null },
+            { type: 'deadlift', target_sets: 1, target_reps: 5, percentage_of_max: 75, is_amrap: false, rpe_target: null },
+            { type: 'deadlift', target_sets: 1, target_reps: 5, percentage_of_max: 85, is_amrap: true, rpe_target: 8 }
+          ] }
+        ]
+      },
+      {
+        week_number: 2,
+        days: [
+          { day_number: 1, exercises: [
+            { type: 'deadlift', target_sets: 1, target_reps: 3, percentage_of_max: 70, is_amrap: false, rpe_target: null },
+            { type: 'deadlift', target_sets: 1, target_reps: 3, percentage_of_max: 80, is_amrap: false, rpe_target: null },
+            { type: 'deadlift', target_sets: 1, target_reps: 3, percentage_of_max: 90, is_amrap: true, rpe_target: 8 }
+          ] }
+        ]
+      },
+      {
+        week_number: 3,
+        days: [
+          { day_number: 1, exercises: [
+            { type: 'deadlift', target_sets: 1, target_reps: 5, percentage_of_max: 75, is_amrap: false, rpe_target: null },
+            { type: 'deadlift', target_sets: 1, target_reps: 3, percentage_of_max: 85, is_amrap: false, rpe_target: null },
+            { type: 'deadlift', target_sets: 1, target_reps: 1, percentage_of_max: 95, is_amrap: true, rpe_target: 9 }
+          ] }
+        ]
+      },
+      {
+        week_number: 4,
+        days: [
+          { day_number: 1, exercises: [
+            { type: 'deadlift', target_sets: 1, target_reps: 5, percentage_of_max: 40, is_amrap: false, rpe_target: null },
+            { type: 'deadlift', target_sets: 1, target_reps: 5, percentage_of_max: 50, is_amrap: false, rpe_target: null },
+            { type: 'deadlift', target_sets: 1, target_reps: 5, percentage_of_max: 60, is_amrap: false, rpe_target: null }
+          ] }
+        ]
+      }
+    ]
   }
-
 ];
 
 /**

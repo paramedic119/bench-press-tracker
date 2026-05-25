@@ -11,17 +11,13 @@ function initSelectors() {
     const daySelect = document.getElementById('day-select');
     if (!programSelect || !weekSelect || !daySelect) return;
 
-    // Programオプション生成
-    PROGRAMS.forEach(p => {
-        const opt = document.createElement('option');
-        opt.value = p.id;
-        opt.textContent = p.name;
-        programSelect.appendChild(opt);
-    });
+    refreshProgramSelect();
 
     // 保存されたProgramがあれば復元
     const savedProgram = getSelectedProgramId();
-    programSelect.value = savedProgram;
+    if (PROGRAMS.find(p => p.id === savedProgram)) {
+        programSelect.value = savedProgram;
+    }
 
     // Week選択肢を更新
     updateWeekOptions();
@@ -64,6 +60,9 @@ function initSelectors() {
             if (savedDay) daySelect.value = savedDay;
         }
 
+        // 主種目が変わるとMAXラベル・MAX値が変わるので更新
+        refreshMaxWeightUI();
+        checkMaxSuggestion();
         renderMenu();
     });
 
@@ -79,6 +78,52 @@ function initSelectors() {
         _setData(`${LS_KEY_DAY}_${progId}`, daySelect.value);
         renderMenu();
     });
+}
+
+/**
+ * プログラム選択 select を PROGRAMS から再構築。
+ * 組込プログラムとカスタムプログラムを optgroup で視覚的に分離。
+ * 現在選択値は可能な限り維持。
+ */
+function refreshProgramSelect() {
+    const programSelect = document.getElementById('program-select');
+    if (!programSelect) return;
+    const currentVal = programSelect.value;
+    programSelect.innerHTML = '';
+
+    const builtin = PROGRAMS.filter(p => !p.isCustom);
+    const customs = PROGRAMS.filter(p => p.isCustom);
+
+    const appendOpts = (parent, list) => {
+        list.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.id;
+            opt.textContent = p.name;
+            parent.appendChild(opt);
+        });
+    };
+
+    if (customs.length > 0) {
+        const gBuiltin = document.createElement('optgroup');
+        gBuiltin.label = '📚 組込プログラム';
+        appendOpts(gBuiltin, builtin);
+        programSelect.appendChild(gBuiltin);
+
+        const gCustom = document.createElement('optgroup');
+        gCustom.label = '📝 カスタム';
+        appendOpts(gCustom, customs);
+        programSelect.appendChild(gCustom);
+    } else {
+        // カスタム0件のときは optgroup なしでフラット表示
+        appendOpts(programSelect, builtin);
+    }
+
+    if (currentVal && PROGRAMS.find(p => p.id === currentVal)) {
+        programSelect.value = currentVal;
+    } else if (PROGRAMS.length > 0) {
+        programSelect.value = PROGRAMS[0].id;
+        setSelectedProgramId(PROGRAMS[0].id);
+    }
 }
 
 /**
@@ -143,6 +188,11 @@ function renderMenu() {
     const maxWeight = getMaxWeight();
     const dayData = getDayData(programId, weekNum, dayNum);
 
+    renderTodaySummary(dayData, maxWeight);
+
+    // 前回実績ルックアップ用に履歴を1回だけ取得してキャッシュ
+    const historyCache = getHistory();
+
     if (!dayData) {
         container.innerHTML = `
       <div class="empty-state">
@@ -150,6 +200,7 @@ function renderMenu() {
         <div class="message">このDayのメニューはありません</div>
       </div>
     `;
+        updateSaveButtonState();
         return;
     }
 
@@ -176,17 +227,25 @@ function renderMenu() {
 
         // セット行
         for (let s = 1; s <= ex.target_sets; s++) {
-            html += `<div class="set-row" id="row-${exIdx}-${s}">`;
-            html += `  <div class="set-checkbox">`;
-            html += `    <input type="checkbox" id="chk-${exIdx}-${s}" class="set-check-input" onchange="toggleSetRowStyle(${exIdx}, ${s})">`;
-            html += `  </div>`;
-            html += `  <div class="set-number">${s}</div>`;
-            html += `  <div class="set-target">`;
-            html += `    <span class="weight-value">${targetWeight}kg</span> × <span class="reps-value">${ex.target_reps}回</span>`;
+            const chkId = `chk-${exIdx}-${s}`;
+            const prev = getPreviousResult(programId, weekNum, dayNum, exIdx, ex.type, s, historyCache);
+            const prevHtml = prev
+                ? `<div class="set-prev">前回: ${prev.weight}kg × ${prev.reps}</div>`
+                : '';
+
+            html += `<div class="set-row">`;
+            // 行全体（チェック〜目標）を <label> でくるみ、タップで切替。デフォルトは未チェック
+            html += `  <label class="set-row-toggle" for="${chkId}">`;
+            html += `    <input type="checkbox" id="${chkId}" class="set-check-input">`;
+            html += `    <div class="set-number">${s}</div>`;
+            html += `    <div class="set-target">`;
+            html += `      <span class="weight-value">${targetWeight}kg</span> × <span class="reps-value">${ex.target_reps}回</span>`;
             if (ex.rpe_target) {
                 html += ` <small class="rpe-target">@RPE ${ex.rpe_target}</small>`;
             }
-            html += `  </div>`;
+            html += prevHtml;
+            html += `    </div>`;
+            html += `  </label>`;
             html += `  <div class="set-inputs">`;
             // 重量ステッパー
             html += `    <div class="stepper-group">`;
@@ -214,6 +273,120 @@ function renderMenu() {
     });
 
     container.innerHTML = html;
+
+    // チェック切替: 保存ボタン更新 + 新規チェック時にインターバルタイマー起動
+    container.querySelectorAll('.set-check-input').forEach(cb => {
+        cb.addEventListener('change', (e) => {
+            updateSaveButtonState();
+            if (e.target.checked) {
+                startRestTimer();
+            }
+        });
+    });
+    // 重量・回数の変化で保存ボタン更新、フォーカス離脱時に 2.5kg/整数 にスナップ
+    container.querySelectorAll('.stepper-value').forEach(el => {
+        el.addEventListener('change', updateSaveButtonState);
+        el.addEventListener('input', updateSaveButtonState);
+        el.addEventListener('blur', _snapStepperValue);
+    });
+
+    updateSaveButtonState();
+}
+
+/**
+ * 直接キーボード入力された値を、ID 接頭辞に基づいてスナップ
+ * （w-N-N → 重量を 2.5kg 単位 / r-N-N → 回数を整数）
+ */
+function _snapStepperValue(e) {
+    const el = e.target;
+    if (!el || !el.id) return;
+    let val = parseFloat(el.value);
+    if (!Number.isFinite(val) || val < 0) val = 0;
+    if (el.id.startsWith('w-')) {
+        el.value = roundWeight(val);
+    } else if (el.id.startsWith('r-')) {
+        el.value = Math.max(0, Math.round(val));
+    }
+    updateSaveButtonState();
+}
+
+/**
+ * 全セットのチェック状態を一括切替（全完了 ⇔ 全解除）
+ */
+function toggleAllSets() {
+    const checkboxes = document.querySelectorAll('.set-check-input');
+    if (checkboxes.length === 0) return;
+    const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+    checkboxes.forEach(cb => { cb.checked = !allChecked; });
+    updateSaveButtonState();
+}
+
+/**
+ * 今日のサマリーカードを描画
+ * @param {object|null} dayData
+ * @param {number} maxWeight
+ */
+function renderTodaySummary(dayData, maxWeight) {
+    const el = document.getElementById('today-summary');
+    if (!el) return;
+    if (!dayData) { el.hidden = true; return; }
+
+    let totalSets = 0;
+    let totalReps = 0;
+    let totalVolume = 0;
+    dayData.exercises.forEach(ex => {
+        const w = calcTargetWeight(maxWeight, ex.percentage_of_max);
+        totalSets += ex.target_sets;
+        totalReps += ex.target_sets * ex.target_reps;
+        totalVolume += w * ex.target_reps * ex.target_sets;
+    });
+
+    el.hidden = false;
+    el.innerHTML = `
+      <div class="summary-item">
+        <div class="summary-label">SETS</div>
+        <div class="summary-value">${totalSets}</div>
+      </div>
+      <div class="summary-item">
+        <div class="summary-label">REPS</div>
+        <div class="summary-value">${totalReps}</div>
+      </div>
+      <div class="summary-item">
+        <div class="summary-label">VOLUME</div>
+        <div class="summary-value">${totalVolume.toLocaleString()}<small>kg</small></div>
+      </div>
+    `;
+}
+
+/**
+ * 保存ボタンのラベル・有効状態を、現在チェックされているセットから算出して更新
+ */
+function updateSaveButtonState() {
+    const btn = document.getElementById('save-btn');
+    const label = document.getElementById('save-btn-label');
+    if (!btn || !label) return;
+
+    const checkedBoxes = document.querySelectorAll('.set-check-input:checked');
+    const count = checkedBoxes.length;
+
+    if (count === 0) {
+        btn.disabled = true;
+        label.textContent = '保存するセットを選択してください';
+        return;
+    }
+
+    // 推定総負荷（チェック済みセットのみ）
+    let vol = 0;
+    checkedBoxes.forEach(cb => {
+        const m = cb.id.match(/^chk-(\d+)-(\d+)$/);
+        if (!m) return;
+        const w = parseFloat(document.getElementById(`w-${m[1]}-${m[2]}`)?.value || '0');
+        const r = parseInt(document.getElementById(`r-${m[1]}-${m[2]}`)?.value || '0', 10);
+        vol += w * r;
+    });
+
+    btn.disabled = false;
+    label.textContent = `💾 ${count}セット保存　(${vol.toLocaleString()}kg)`;
 }
 
 /**
@@ -250,8 +423,14 @@ function saveWorkout() {
             }
             const wInput = document.getElementById(`w-${exIdx}-${s}`);
             const rInput = document.getElementById(`r-${exIdx}-${s}`);
-            const weight = parseFloat(wInput?.value || '0');
+            const rawWeight = parseFloat(wInput?.value || '0');
             const reps = parseInt(rInput?.value || '0', 10);
+            // 0kg / 0回 のセットは無効として除外（ボリューム・推定1RM等の集計を歪めない）
+            if (!(rawWeight > 0) || !(reps > 0)) continue;
+            // blur をスキップしたまま保存した場合のためにここでも 2.5kg にスナップ
+            const weight = roundWeight(rawWeight);
+            // 表示も同期
+            if (wInput) wInput.value = weight;
             sets.push({ set: s, weight, reps });
             hasAnyCheckedSets = true;
         }
@@ -259,6 +438,7 @@ function saveWorkout() {
             record.exercises.push({
                 type: ex.type,
                 name: EXERCISE_NAMES[ex.type] || ex.type,
+                exIdx: exIdx,
                 sets: sets
             });
         }
@@ -276,6 +456,12 @@ function saveWorkout() {
 
     showToast('✅ 実績を保存しました！');
 
+    // 推定1RM が現在MAXを超えていればサジェスト表示
+    checkMaxSuggestion();
+
+    // 新規アチーブメント判定（保存トーストの後に出る）
+    if (typeof checkAchievements === 'function') checkAchievements(true);
+
     // 次のDayへ自動進行
     setTimeout(() => {
         advanceToNextDay(programId, weekNum, dayNum);
@@ -283,7 +469,9 @@ function saveWorkout() {
 }
 
 /**
- * ステッパーの値を増減させる
+ * ステッパーの値を増減させる。
+ * delta が整数なら回数として整数に、小数なら重量として 2.5kg 単位にスナップする
+ * （ジムでは 2.5kg 刻みでしかロードできないため）。
  * @param {string} inputId - 対象inputのID
  * @param {number} delta - 増減量
  * @param {number} min - 最小値
@@ -294,8 +482,14 @@ function adjustValue(inputId, delta, min = 0) {
     let val = parseFloat(input.value) || 0;
     val += delta;
     if (val < min) val = min;
-    // 浮動小数点誤差対策 (ex: 2.5の倍数など)
-    input.value = Math.round(val * 10) / 10;
+    if (Number.isInteger(delta)) {
+        // 回数: 整数に丸める
+        val = Math.round(val);
+    } else {
+        // 重量: 必ず 2.5kg 単位にスナップ
+        val = roundWeight(val);
+    }
+    input.value = val;
 }
 
 /**

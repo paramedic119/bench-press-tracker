@@ -10,6 +10,12 @@
   <meta name="description" content="ベンチプレスのMAX重量向上をサポートする管理アプリ。1RMに基づきトレーニングメニューを自動計算。">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Power Tracker">
+  <meta name="theme-color" content="#050a14">
+
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="Blue_Angels_Insignia.svg.png">
 
   <!-- Library -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -39,19 +45,23 @@
 
       <!-- MAX重量入力 -->
       <div class="max-weight-bar">
-        <label for="max-weight-input">CURRENT MAX</label>
+        <label for="max-weight-input" id="max-weight-label">BENCH MAX</label>
         <input type="number" id="max-weight-input" value="100" step="2.5" min="0" inputmode="decimal">
         <span class="unit">kg</span>
       </div>
-    </header>
 
-    <!-- タブナビゲーション -->
-    <nav class="tab-nav">
-      <button class="tab-btn active" data-tab="menu">メニュー</button>
-      <button class="tab-btn" data-tab="progress">プログラム</button>
-      <button class="tab-btn" data-tab="history">履歴</button>
-      <button class="tab-btn" data-tab="chart">グラフ</button>
-    </nav>
+      <!-- MAX更新サジェスト -->
+      <div id="max-suggestion" class="max-suggestion" hidden></div>
+
+      <!-- タブナビゲーション -->
+      <nav class="tab-nav">
+        <button class="tab-btn active" data-tab="menu"><span class="tab-icon" aria-hidden="true">📋</span><span class="tab-text">メニュー</span></button>
+        <button class="tab-btn" data-tab="progress"><span class="tab-icon" aria-hidden="true">📅</span><span class="tab-text">進捗</span></button>
+        <button class="tab-btn" data-tab="history"><span class="tab-icon" aria-hidden="true">📝</span><span class="tab-text">履歴</span></button>
+        <button class="tab-btn" data-tab="chart"><span class="tab-icon" aria-hidden="true">📊</span><span class="tab-text">グラフ</span></button>
+        <button class="tab-btn" data-tab="settings"><span class="tab-icon" aria-hidden="true">⚙️</span><span class="tab-text">設定</span></button>
+      </nav>
+    </header>
 
     <!-- タブコンテンツ: 今日のメニュー -->
     <main id="tab-menu" class="tab-content active">
@@ -78,14 +88,23 @@
         </div>
       </div>
 
-      <div class="section-title">Training Menu</div>
+      <div id="today-summary" class="today-summary" hidden>
+        <!-- JSで動的に生成: セット数 / レップ / 推定総負荷 -->
+      </div>
+
+      <div class="menu-header-row">
+        <div class="section-title">Training Menu</div>
+        <button class="bulk-toggle-btn" onclick="toggleAllSets()">✓ 全完了 / 解除</button>
+      </div>
       <div id="menu-container">
         <!-- JSで動的に生成 -->
       </div>
 
-      <button id="save-btn" class="btn-primary mt-16" onclick="saveWorkout()">
-        <span>💾 実績を保存する</span>
-      </button>
+      <div class="save-bar">
+        <button id="save-btn" class="btn-primary" onclick="saveWorkout()">
+          <span id="save-btn-label">💾 実績を保存する</span>
+        </button>
+      </div>
     </main>
 
     <!-- タブコンテンツ: プログラム全体 -->
@@ -107,6 +126,78 @@
       </div>
       <div id="history-list">
         <!-- JSで動的に生成 -->
+      </div>
+    </section>
+
+    <!-- タブコンテンツ: 設定 -->
+    <section id="tab-settings" class="tab-content">
+      <div class="section-title">App Settings</div>
+
+      <div class="settings-group">
+        <div class="settings-group-title">⏱ インターバルタイマー</div>
+        <div class="settings-row">
+          <label for="rest-duration-select">デフォルト休憩時間</label>
+          <select id="rest-duration-select" onchange="setRestDuration(parseInt(this.value, 10))">
+            <option value="60">1分</option>
+            <option value="90">1分30秒</option>
+            <option value="120">2分</option>
+            <option value="180" selected>3分</option>
+            <option value="240">4分</option>
+            <option value="300">5分</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <div class="settings-group-title">💾 データ管理</div>
+        <div class="settings-row settings-row-stack">
+          <p class="settings-help">履歴とMAX重量、選択中プログラムを JSON でバックアップ・復元できます。</p>
+          <div class="data-controls">
+            <button class="btn-secondary" onclick="exportData()">📥 エクスポート</button>
+            <button class="btn-secondary" onclick="document.getElementById('import-file').click()">📤 インポート</button>
+            <input type="file" id="import-file" accept=".json,application/json" style="display:none" onchange="importData(event)">
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-group settings-group-danger">
+        <div class="settings-group-title">⚠️ 危険操作</div>
+        <div class="settings-row settings-row-stack">
+          <p class="settings-help">操作は取り消せません。実行前に必ずエクスポートでバックアップを取ってください。</p>
+          <button class="btn-danger" onclick="resetHistory()">🗑️ 履歴をすべて削除</button>
+          <button class="btn-danger" onclick="resetAllData()">💣 全データをリセット</button>
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <div class="settings-group-title">📝 カスタムプログラム</div>
+        <p class="settings-help">自分用のプログラムを作成・編集できます。週・Day・種目を自由に組み合わせて構築できます。</p>
+        <div id="custom-program-list" class="custom-program-list">
+          <!-- JSで動的に生成 -->
+        </div>
+        <div class="cp-create-actions">
+          <button class="btn-secondary" onclick="openProgramEditor()">➕ 新規作成</button>
+          <button class="btn-secondary" onclick="openProgramGenerator()">🤖 履歴から生成</button>
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <div class="settings-group-title">🏅 アチーブメント</div>
+        <div id="achievements-list" class="achievements-list">
+          <!-- JSで動的に生成 -->
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <div class="settings-group-title">ℹ️ アプリ情報</div>
+        <div class="settings-row">
+          <span>バージョン</span>
+          <span id="app-version" class="settings-value">—</span>
+        </div>
+        <div class="settings-row">
+          <span>履歴件数</span>
+          <span id="record-count" class="settings-value">—</span>
+        </div>
       </div>
     </section>
 
@@ -145,7 +236,23 @@
 
       <div id="chart-section" style="display: none;">
         <div class="chart-section">
-          <h3>🏆 推定1RM 推移</h3>
+          <h3>🔥 トレーニング頻度 <small class="chart-hint">直近12週間</small></h3>
+          <div id="heatmap-container" class="heatmap-container">
+            <!-- JSで動的に生成 -->
+          </div>
+        </div>
+
+        <div class="chart-period-row">
+          <div class="chart-period-label">推移グラフの期間</div>
+          <div class="period-filter">
+            <button class="period-btn" data-period="1m" onclick="setChartPeriod('1m')">1ヶ月</button>
+            <button class="period-btn" data-period="3m" onclick="setChartPeriod('3m')">3ヶ月</button>
+            <button class="period-btn active" data-period="all" onclick="setChartPeriod('all')">全期間</button>
+          </div>
+        </div>
+
+        <div class="chart-section">
+          <h3>🏆 推定1RM 推移 <small class="chart-hint">⭐ = 自己ベスト更新</small></h3>
           <div class="chart-container">
             <canvas id="maxWeightChart"></canvas>
           </div>
@@ -161,6 +268,152 @@
     </section>
   </div>
 
+  <!-- インターバルタイマー -->
+  <div id="rest-timer" class="rest-timer">
+    <span class="timer-icon">⏱</span>
+    <span id="rest-timer-display" class="timer-display">3:00</span>
+    <button type="button" class="timer-btn" onclick="adjustRestTimer(-30)">-30</button>
+    <button type="button" class="timer-btn" onclick="adjustRestTimer(30)">+30</button>
+    <button type="button" class="timer-btn timer-close" onclick="stopRestTimer()">×</button>
+  </div>
+
+  <!-- プログラム生成器（履歴から自動生成） -->
+  <div id="program-generator-modal" class="modal" hidden>
+    <div class="modal-backdrop" onclick="closeProgramGenerator()"></div>
+    <div class="modal-sheet" role="dialog" aria-modal="true" aria-labelledby="program-generator-title">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <h2 id="program-generator-title">🤖 履歴から生成</h2>
+        <button type="button" class="modal-close" onclick="closeProgramGenerator()" aria-label="閉じる">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="pe-section">
+          <label for="pg-lift">メインリフト</label>
+          <select id="pg-lift" onchange="_pgOnLiftChange()">
+            <option value="bench_press">ベンチプレス</option>
+            <option value="squat">スクワット</option>
+            <option value="deadlift">デッドリフト</option>
+          </select>
+        </div>
+
+        <div class="pg-section-label">📊 過去12週の解析</div>
+        <div id="pg-analysis" class="pg-analysis"></div>
+
+        <div class="pg-section-label">プログラムスタイル</div>
+        <div class="pg-template-grid">
+          <label class="pg-template-card">
+            <input type="radio" name="pg-template" value="linear" onchange="_pgOnTemplateChange()">
+            <div class="pg-template-content">
+              <div class="pg-template-icon">📈</div>
+              <div class="pg-template-name">線形強化</div>
+              <div class="pg-template-desc">週ごとに +2.5% 漸増</div>
+            </div>
+          </label>
+          <label class="pg-template-card">
+            <input type="radio" name="pg-template" value="volume" onchange="_pgOnTemplateChange()">
+            <div class="pg-template-content">
+              <div class="pg-template-icon">🏋️</div>
+              <div class="pg-template-name">ボリューム</div>
+              <div class="pg-template-desc">セット多めで肥大重視</div>
+            </div>
+          </label>
+          <label class="pg-template-card">
+            <input type="radio" name="pg-template" value="peaking" onchange="_pgOnTemplateChange()">
+            <div class="pg-template-content">
+              <div class="pg-template-icon">🎯</div>
+              <div class="pg-template-name">ピーキング</div>
+              <div class="pg-template-desc">最終週で MAX 挑戦</div>
+            </div>
+          </label>
+        </div>
+
+        <div class="pg-controls-row">
+          <div class="pe-section pg-control-half">
+            <label for="pg-weeks">期間</label>
+            <select id="pg-weeks" onchange="_pgOnWeeksChange()">
+              <option value="3">3週</option>
+              <option value="4" selected>4週</option>
+              <option value="6">6週</option>
+              <option value="8">8週</option>
+            </select>
+          </div>
+          <div class="pe-section pg-control-half">
+            <label for="pg-frequency">週あたり</label>
+            <select id="pg-frequency" onchange="_pgOnFrequencyChange()">
+              <option value="1">週1回</option>
+              <option value="2">週2回</option>
+              <option value="3" selected>週3回</option>
+              <option value="4">週4回</option>
+              <option value="5">週5回</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="pg-section-label">プレビュー</div>
+        <div id="pg-preview" class="pg-preview"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeProgramGenerator()">キャンセル</button>
+        <button type="button" class="btn-primary" onclick="generateAndOpenEditor()">✨ 生成してエディタへ</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- カスタムプログラム エディタ（ボトムシート / 全画面） -->
+  <div id="program-editor-modal" class="modal" hidden>
+    <div class="modal-backdrop" onclick="closeProgramEditor()"></div>
+    <div class="modal-sheet modal-sheet-full" role="dialog" aria-modal="true" aria-labelledby="program-editor-title">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <h2 id="program-editor-title">新規プログラム作成</h2>
+        <button type="button" class="modal-close" onclick="closeProgramEditor()" aria-label="閉じる">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="pe-section">
+          <label for="pe-name">プログラム名 <span class="pe-required">*</span></label>
+          <input type="text" id="pe-name" placeholder="例: マイベンチ5/3/1" maxlength="50">
+        </div>
+        <div class="pe-section">
+          <label for="pe-description">説明</label>
+          <input type="text" id="pe-description" placeholder="任意" maxlength="100">
+        </div>
+        <div class="pe-section">
+          <label for="pe-main-lift">メインリフト</label>
+          <select id="pe-main-lift">
+            <option value="bench_press">ベンチプレス</option>
+            <option value="squat">スクワット</option>
+            <option value="deadlift">デッドリフト</option>
+          </select>
+        </div>
+
+        <div class="pe-section-divider">プログラム内容</div>
+        <div id="pe-weeks">
+          <!-- JSで動的に生成 -->
+        </div>
+        <button type="button" class="btn-secondary pe-add-week" onclick="addWeekToEditor()">+ 週を追加</button>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeProgramEditor()">キャンセル</button>
+        <button type="button" class="btn-primary" onclick="saveProgramEditor()">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 履歴詳細モーダル（ボトムシート） -->
+  <div id="history-modal" class="modal" hidden>
+    <div class="modal-backdrop" onclick="closeHistoryDetail()"></div>
+    <div class="modal-sheet" role="dialog" aria-modal="true" aria-labelledby="history-modal-title">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <h2 id="history-modal-title">記録の詳細</h2>
+        <button type="button" class="modal-close" onclick="closeHistoryDetail()" aria-label="閉じる">×</button>
+      </div>
+      <div id="history-modal-body" class="modal-body">
+        <!-- JSで動的に生成 -->
+      </div>
+    </div>
+  </div>
+
   <!-- トースト通知 -->
   <div id="toast" class="toast"></div>
 
@@ -171,6 +424,9 @@
   <script src="js/history.js"></script>
   <script src="js/progress.js"></script>
   <script src="js/chart.js"></script>
+  <script src="js/achievements.js"></script>
+  <script src="js/program-editor.js"></script>
+  <script src="js/program-generator.js"></script>
 
 </body>
 
