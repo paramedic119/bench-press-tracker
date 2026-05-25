@@ -4,7 +4,13 @@
   "description": "Bench Press Tracking App",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build:gas": "node build_gas.js",
+    "push:gas": "npm run build:gas && cd gas_dist && clasp push -f",
+    "deploy:gas": "npm run push:gas && cd gas_dist && clasp deploy -i \"$npm_package_config_gasDeploymentId\" -d \"auto: $(date -u +%Y-%m-%dT%H:%M:%SZ)\""
+  },
+  "config": {
+    "gasDeploymentId": "AKfycbxf6wcJKa5Dj8VjcKo3ljjlJMSixm4zeX9Etda77XkwW-4XtL5AVjcD7ru0dBybmIEuaw"
   },
   "keywords": [],
   "author": "",
