@@ -21,6 +21,12 @@ function getCompletedDays(programId) {
 
 /**
  * 指定プログラムで次に取り組むべきWeek/Dayを取得
+ *
+ * 「先頭から最初の未完了Day」ではなく、
+ * 「プログラム順で最後に完了したDayの次のDay」を返す。
+ * これにより、途中（例: Week3 Day2）から記録を始めても
+ * Day1に戻らず、その続きから再開できる。
+ *
  * @param {string} programId
  * @returns {{week: number, day: number}|null}
  */
@@ -29,15 +35,33 @@ function getNextDay(programId) {
     if (!program) return null;
 
     const completed = getCompletedDays(programId);
+
+    // 最初のDay（完了済みが無い場合のデフォルト）
+    const firstWeek = program.weeks[0];
+    const firstDay = (firstWeek && firstWeek.days.length > 0)
+        ? { week: firstWeek.week_number, day: firstWeek.days[0].day_number }
+        : null;
+
+    if (completed.size === 0) {
+        return firstDay; // まだ記録が無ければ最初のDayから
+    }
+
+    // プログラム順で「最後に完了したDay」を探す
+    let lastCompleted = null;
     for (const week of program.weeks) {
         for (const day of week.days) {
             const key = `W${week.week_number}D${day.day_number}`;
-            if (!completed.has(key)) {
-                return { week: week.week_number, day: day.day_number };
+            if (completed.has(key)) {
+                lastCompleted = { week: week.week_number, day: day.day_number };
             }
         }
     }
-    return null; // 全て完了
+
+    // 完了済みキーがプログラムのDayと一致しない場合は最初のDayへ
+    if (!lastCompleted) return firstDay;
+
+    // 最後に完了したDayの次のDayへ（プログラム終了ならnull）
+    return getFollowingDay(programId, lastCompleted.week, lastCompleted.day);
 }
 
 /**
