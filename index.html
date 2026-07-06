@@ -445,10 +445,9 @@ function renderWorkout(){
       const inp=$(`lr-${id}-${i}`);
       let v=Math.round(+inp.value||0)+dir; if(v<1)v=1;
       inp.value=v;
-    }else{ // RPE: 0.5刻み・5〜10
+    }else{ // RPE: 1刻み・5〜10
       const inp=$(`lp-${id}-${i}`);
-      let v=(+inp.value||0)+dir*0.5;
-      v=Math.round(v*2)/2; if(v<5)v=5; if(v>10)v=10;
+      let v=Math.round(+inp.value||0)+dir; if(v<5)v=5; if(v>10)v=10;
       inp.value=fmt(v);
     }
   });
