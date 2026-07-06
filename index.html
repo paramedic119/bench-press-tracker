@@ -18,6 +18,8 @@ html{font-size:16px}
 body{background:var(--bg);color:var(--text);font-family:'Noto Sans JP',sans-serif;
   padding-bottom:calc(64px + env(safe-area-inset-bottom));min-height:100vh}
 .num{font-family:'Bebas Neue',sans-serif;letter-spacing:.03em}
+input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+input[type=number]{-moz-appearance:textfield;appearance:textfield}
 
 /* header */
 header{position:sticky;top:0;z-index:20;background:linear-gradient(180deg,var(--bg) 75%,transparent);
@@ -101,18 +103,29 @@ header .sub{font-size:.7rem;color:var(--muted);margin-top:2px}
 .logclear{width:100%;padding:8px;margin-top:6px;border-radius:10px;border:1px solid var(--line);
   background:transparent;color:var(--muted);font-size:.75rem}
 .logresult{font-size:.75rem;color:var(--actual);margin:4px 0 8px}
-.setlog{display:flex;align-items:center;gap:6px;margin-bottom:6px}
-.setlog .setno{width:22px;text-align:center;color:var(--muted);font-size:1rem;flex-shrink:0}
-.setlog input{width:100%;min-width:0;padding:8px 6px;border-radius:8px;border:1px solid var(--line);
-  background:var(--bg);color:var(--text);font-size:.95rem;font-family:'Bebas Neue',sans-serif;letter-spacing:.05em;text-align:center}
-.setlog input:first-of-type{flex:1.3}.setlog input{flex:1}
-.setlog .setok{width:40px;height:38px;flex-shrink:0;border-radius:8px;border:1px solid var(--line);
-  background:transparent;color:var(--muted);font-size:1rem}
+.setlog{display:flex;align-items:center;gap:3px;margin-bottom:8px;flex-wrap:wrap}
+.setlog .setno{width:16px;text-align:center;color:var(--muted);font-size:1rem;flex-shrink:0}
+/* − / ＋ ステッパー（重量・回数） */
+.stepper{display:flex;align-items:stretch;border:1px solid var(--line);border-radius:8px;
+  background:var(--bg);overflow:hidden}
+.stepper.stw{flex:1.5 1 92px;min-width:90px}    /* 重量: 3桁+.5 に対応して広め */
+.stepper.str{flex:1 1 66px;min-width:64px}       /* 回数 */
+.stepper.stp{flex:0 1 76px;min-width:74px}       /* RPE: 5〜10 */
+.stepper .stepbtn{width:24px;flex-shrink:0;border:none;background:var(--surface2);color:var(--accent);
+  font-size:1.15rem;line-height:1;font-weight:700;font-family:'Noto Sans JP',sans-serif;
+  display:flex;align-items:center;justify-content:center;user-select:none;touch-action:manipulation}
+.stepper .stepbtn:active{background:var(--accent);color:#0F1216}
+.stepper input{flex:1;min-width:0;width:100%;padding:9px 2px;border:none;background:transparent;
+  color:var(--text);font-size:1.05rem;font-family:'Bebas Neue',sans-serif;letter-spacing:.05em;text-align:center}
+.setlog .setok{width:36px;height:40px;flex-shrink:0;border-radius:8px;border:1px solid var(--line);
+  background:transparent;color:var(--muted);font-size:1.1rem}
 .setlog .setok.on{background:var(--actual);border-color:var(--actual);color:#0F1216}
-.loghead{display:flex;gap:6px;font-size:.62rem;color:var(--muted);margin-bottom:4px}
-.loghead span:first-child{width:22px;flex-shrink:0}
-.loghead span{flex:1;text-align:center}.loghead span:nth-child(2){flex:1.3}
-.loghead span:last-child{width:40px;flex:none}
+.loghead{display:flex;gap:3px;font-size:.62rem;color:var(--muted);margin-bottom:5px}
+.loghead .h-no{width:16px;flex-shrink:0}
+.loghead .h-w{flex:1.5 1 92px;min-width:90px;text-align:center}
+.loghead .h-r{flex:1 1 66px;min-width:64px;text-align:center}
+.loghead .h-p{flex:0 1 76px;min-width:74px;text-align:center}
+.loghead .h-ok{width:36px;flex-shrink:0}
 .suggest{font-size:.72rem;color:var(--accent);margin:-2px 0 8px 28px}
 .suggest b{font-family:'Bebas Neue',sans-serif;font-size:.95rem;letter-spacing:.05em}
 
@@ -366,9 +379,21 @@ function renderWorkout(){
         : w;
       rows+=`<div class="setlog">
         <span class="setno num">${i+1}</span>
-        <input type="number" inputmode="decimal" step="0.5" id="lw-${s.id}-${i}" value="${fmt(preW)}">
-        <input type="number" inputmode="numeric" id="lr-${s.id}-${i}" value="${lg?lg.reps:s.reps}">
-        <input type="number" inputmode="decimal" step="0.5" min="5" max="10" id="lp-${s.id}-${i}" value="${lg?fmt(lg.rpe):fmt(s.rpe)}">
+        <div class="stepper stw">
+          <button class="stepbtn" data-t="w" data-sid="${s.id}" data-i="${i}" data-d="-1">－</button>
+          <input type="number" inputmode="decimal" step="0.5" id="lw-${s.id}-${i}" value="${fmt(preW)}">
+          <button class="stepbtn" data-t="w" data-sid="${s.id}" data-i="${i}" data-d="1">＋</button>
+        </div>
+        <div class="stepper str">
+          <button class="stepbtn" data-t="r" data-sid="${s.id}" data-i="${i}" data-d="-1">－</button>
+          <input type="number" inputmode="numeric" id="lr-${s.id}-${i}" value="${lg?lg.reps:s.reps}">
+          <button class="stepbtn" data-t="r" data-sid="${s.id}" data-i="${i}" data-d="1">＋</button>
+        </div>
+        <div class="stepper stp">
+          <button class="stepbtn" data-t="p" data-sid="${s.id}" data-i="${i}" data-d="-1">－</button>
+          <input type="number" inputmode="decimal" step="0.5" min="5" max="10" id="lp-${s.id}-${i}" value="${lg?fmt(lg.rpe):fmt(s.rpe)}">
+          <button class="stepbtn" data-t="p" data-sid="${s.id}" data-i="${i}" data-d="1">＋</button>
+        </div>
         <button class="setok ${lg?'on':''}" data-slog="${s.id}" data-i="${i}">${lg?'✓':'＋'}</button>
       </div>`;
       if(lg&&lg.w>0&&i<s.sets-1){
@@ -394,7 +419,7 @@ function renderWorkout(){
       ${logRes?`<div class="logresult">${logRes}</div>`:''}
       <button class="logtoggle ${hasLog?'has':''}" data-log="${s.id}">${hasLog?'セット記録を編集':'セット毎に記録（任意）'}</button>
       <div class="logarea ${hasLog&&!done?'open':''}" id="log-${s.id}">
-        <div class="loghead"><span></span><span>重量kg</span><span>回数</span><span>RPE</span><span></span></div>
+        <div class="loghead"><span class="h-no"></span><span class="h-w">重量 kg</span><span class="h-r">回数</span><span class="h-p">RPE</span><span class="h-ok"></span></div>
         ${rows}
         ${hasLog?`<button class="logclear" data-clear="${s.id}">この種目の記録を削除</button>`:''}
       </div>
@@ -408,6 +433,24 @@ function renderWorkout(){
   });
   $('sessions').querySelectorAll('.logtoggle').forEach(b=>b.onclick=()=>
     $('log-'+b.dataset.log).classList.toggle('open'));
+  /* − / ＋ ステッパー: 重量は丸め刻み、回数は1ずつ（入力欄を更新するだけ／記録は✓で確定） */
+  $('sessions').querySelectorAll('.stepbtn').forEach(b=>b.onclick=()=>{
+    const id=b.dataset.sid,i=+b.dataset.i,dir=+b.dataset.d;
+    if(b.dataset.t==='w'){
+      const inp=$(`lw-${id}-${i}`), step=S.round>0?S.round:2.5;
+      let v=(+inp.value||0)+dir*step;
+      v=Math.round(v/step)*step; if(v<0)v=0; // バー刻みにスナップ
+      inp.value=fmt(v);
+    }else if(b.dataset.t==='r'){
+      const inp=$(`lr-${id}-${i}`);
+      let v=Math.round(+inp.value||0)+dir; if(v<1)v=1;
+      inp.value=v;
+    }else{ // RPE: 1刻み・5〜10
+      const inp=$(`lp-${id}-${i}`);
+      let v=Math.round(+inp.value||0)+dir; if(v<5)v=5; if(v>10)v=10;
+      inp.value=fmt(v);
+    }
+  });
   $('sessions').querySelectorAll('[data-slog]').forEach(b=>b.onclick=()=>{
     const id=b.dataset.slog, i=+b.dataset.i;
     const logs=Array.isArray(S.logs[id])?S.logs[id]:[];
