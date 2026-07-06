@@ -1,0 +1,25 @@
+{
+  "hosting": {
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      ".firebaserc",
+      "**/.*",
+      "**/node_modules/**",
+      "build_gas.js",
+      "gas_dist/**",
+      "package.json",
+      "package-lock.json",
+      "*.xlsx"
+    ],
+    "cleanUrls": true,
+    "headers": [
+      {
+        "source": "/index.html",
+        "headers": [
+          { "key": "Cache-Control", "value": "no-cache, max-age=0" }
+        ]
+      }
+    ]
+  }
+}

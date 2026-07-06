@@ -2,3 +2,4 @@ node_modules/
 .clasp.json
 gas_dist/
 *.log
+.firebase/
