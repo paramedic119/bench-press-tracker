@@ -165,6 +165,10 @@ header .sub{font-size:.7rem;color:var(--muted);margin-top:2px}
 .sw.on::after{left:25px;background:#fff}
 .danger{width:100%;padding:11px;border-radius:10px;border:1px solid #C0392B;background:transparent;color:#E06052;font-size:.82rem;margin-top:4px}
 .ghostbtn{width:100%;padding:11px;border-radius:10px;border:1px solid var(--line);background:transparent;color:var(--text);font-size:.82rem;margin-bottom:8px}
+.nextcycle{width:100%;padding:12px;border-radius:10px;border:none;background:var(--accent);
+  color:#14100C;font-weight:700;font-size:.85rem;margin-top:10px}
+.chartbox+.chartbox{margin-top:12px}
+.chartnote{font-size:.62rem;color:var(--muted);margin-top:6px;line-height:1.5}
 
 /* tabbar */
 nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:rgba(15,18,22,.96);
@@ -205,6 +209,23 @@ nav button.sel{color:var(--accent)}
       <span><i style="background:var(--actual)"></i>実績 e1RM</span>
     </div>
   </div>
+  <div class="chartbox">
+    <h3>週間ボリューム — 全種目・計画値</h3>
+    <svg id="volChart" width="100%" height="170" viewBox="0 0 340 170" preserveAspectRatio="none"></svg>
+    <div class="legend">
+      <span><i style="background:#3A4450"></i>総ボリューム</span>
+      <span><i style="background:var(--accent)"></i>補正ボリューム</span>
+    </div>
+    <div class="chartnote">補正ボリューム = 重量×回数×セット数×(RPE/10)²×(重量/e1RM)²（ExcelのI・J列）。テスト週(4/8/12)で疲労が抜ける波形が見えます。</div>
+  </div>
+  <div class="chartbox" id="cycleBox" style="display:none">
+    <h3 id="cycleTitle">サイクルごとのMAX推移</h3>
+    <svg id="cycleChart" width="100%" height="170" viewBox="0 0 340 170" preserveAspectRatio="none"></svg>
+    <div class="legend">
+      <span><i style="background:var(--accent)"></i>サイクル開始MAX</span>
+      <span><i style="background:var(--actual)"></i>今サイクルのベストe1RM</span>
+    </div>
+  </div>
 </div>
 
 <div class="page" id="page-settings">
@@ -228,6 +249,11 @@ nav button.sel{color:var(--accent)}
       <p>ONにすると、記録したセットのうち<b>ベストのe1RM</b>を使って以降のセッション重量を再計算します。セット記録中は次セットの推奨重量も毎セット更新されます。</p>
       <button class="sw" id="adaptiveSw"></button>
     </div>
+  </div>
+  <div class="sgroup">
+    <h3>サイクル<small id="cycleInfo"></small></h3>
+    <button class="ghostbtn" id="btnNextCycle">サイクルを完了して次のサイクルを開始</button>
+    <p style="font-size:.68rem;color:var(--muted);line-height:1.6">今の記録を履歴にアーカイブし、サイクル中ベストのe1RMを新しいMAXにしてWeek 1から再開します。Week 12の最終テストを記録するとワークアウト画面にも開始ボタンが出ます。</p>
   </div>
   <div class="sgroup">
     <h3>データ</h3>
@@ -280,9 +306,11 @@ const store={
   set(v){try{localStorage.setItem(KEY,JSON.stringify(v))}catch(e){mem[KEY]=v}}
 };
 const defaults=()=>({maxes:{MB:110,MN:105,ML:100},round:2.5,bar:20,adaptive:false,
-  logs:{},sets:{},ui:{week:1,day:1,ex:'BP'}});
+  logs:{},sets:{},ui:{week:1,day:1,ex:'BP'},history:[],cycle:{n:1,started:Date.now()}});
 let S=Object.assign(defaults(),store.get()||{});
 S.maxes=Object.assign(defaults().maxes,S.maxes); S.ui=Object.assign(defaults().ui,S.ui);
+S.cycle=Object.assign({n:1,started:Date.now()},S.cycle||{});
+if(!Array.isArray(S.history))S.history=[];
 /* 旧形式（セッション単位ログ）→ セット配列へ移行 */
 for(const k in S.logs){const v=S.logs[k]; if(v&&!Array.isArray(v)) S.logs[k]=[v];}
 const save=()=>store.set(S);
@@ -295,6 +323,37 @@ const bestE1=id=>{
 };
 /* e1RMから 目標回数@目標RPE に対する重量を逆算（e1RM式の逆関数） */
 const suggestW=(e,reps,rpe)=>(reps===1&&rpe===10)?e:e*33/(33+reps+10-rpe);
+
+/* ============ サイクル管理 ============ */
+const MKEY={BP:'MB',NR:'MN',LG:'ML'};
+const FINAL_TEST_ID=121;              /* Week12 Day3 ベンチのMAXテスト */
+/* サイクル中の種目別ベストe1RM（記録がなければnull） */
+const cycleBest=()=>{
+  const best={BP:null,NR:null,LG:null};
+  for(const s of PROGRAM){
+    const b=bestE1(s.id);
+    if(b!==null&&(best[s.ex]===null||b>best[s.ex]))best[s.ex]=b;
+  }
+  return best;
+};
+function startNextCycle(){
+  const best=cycleBest(), old=Object.assign({},S.maxes), nm={};
+  for(const ex in MKEY){
+    const k=MKEY[ex];
+    nm[k]=best[ex]!==null?Math.round(best[ex]*2)/2:old[k]; // 0.5kg刻み・記録なしは現状維持
+  }
+  const lines=Object.keys(MKEY).map(ex=>{
+    const k=MKEY[ex],d=nm[k]-old[k];
+    return `${EX[ex]}: ${fmt(old[k])} → ${fmt(nm[k])}kg（${d>=0?'+':''}${fmt(d)}）`;
+  }).join('\n');
+  if(!confirm(`サイクル${S.cycle.n}を完了して記録をアーカイブし、次のサイクルを開始します。\n\n新しいMAX（あとで設定から変更できます）\n${lines}\n\nよろしいですか？`))return;
+  S.history.push({n:S.cycle.n,started:S.cycle.started,ended:Date.now(),
+    maxesStart:old,maxesEnd:nm,best,logs:S.logs,sets:S.sets});
+  S.maxes=nm; S.logs={}; S.sets={};
+  S.cycle={n:S.cycle.n+1,started:Date.now()};
+  S.ui.week=1; S.ui.day=1;
+  save(); renderAll(); toast(`サイクル${S.cycle.n}を開始 — 新MAXで全12週を再計算しました`);
+}
 
 /* ============ チェーン計算 ============ */
 function computePlan(){
@@ -406,6 +465,9 @@ function renderWorkout(){
     }
     const be=bestE1(s.id);
     const logRes=be!==null?`本日ベスト e1RM <b>${fmt(be)}kg</b>${S.adaptive?' → 以降のセッションに反映中':''}`:'';
+    /* ボリューム（Excel I列）と補正ボリューム（J列）: 丸め前の計画値で計算 */
+    const vol=raw*s.reps*s.sets;
+    const adj=vol*Math.pow(s.rpe/10,2)*Math.pow(raw/e1rm(raw,s.reps,s.rpe),2);
     return `<div class="card ${done?'completed':''}">
       ${test?'<span class="testbadge">MAX TEST</span>':''}
       <div class="exrow"><span class="ex">${EX[s.ex]}</span>
@@ -415,6 +477,7 @@ function renderWorkout(){
         <span class="scheme"><span class="rs num">${s.reps}×${s.sets}</span><br><span class="rpe">@RPE ${fmt(s.rpe)}</span></span>
       </div>
       ${S.round>0&&Math.abs(w-raw)>0.01?`<div class="raww">計算値 ${raw.toFixed(1)}kg → ${fmt(S.round)}kg刻みに丸め</div>`:''}
+      <div class="raww">総Vol ${Math.round(vol).toLocaleString()}kg ・ 補正Vol ${Math.round(adj).toLocaleString()}kg</div>
       <div class="plates">${plateHTML(w)}</div>
       <div class="sets">${setsHtml}</div>
       ${logRes?`<div class="logresult">${logRes}</div>`:''}
@@ -424,6 +487,7 @@ function renderWorkout(){
         ${rows}
         ${hasLog?`<button class="logclear" data-clear="${s.id}">この種目の記録を削除</button>`:''}
       </div>
+      ${s.id===FINAL_TEST_ID&&(hasLog||done)?`<button class="nextcycle" data-next>この結果で次のサイクルを開始 →</button>`:''}
     </div>`;
   }).join('');
 
@@ -465,16 +529,23 @@ function renderWorkout(){
     logs[i]={w,reps,rpe}; S.logs[id]=logs;
     S.sets[id]=S.sets[id]||[]; S.sets[id][i]=true; // チェックも連動
     save(); renderWorkout(); renderHead();
+    /* テスト日(1rep@RPE10)の記録が現MAXを超えたら自己ベスト通知 */
+    const sess=PROGRAM.find(x=>x.id===+id);
+    if(sess&&sess.reps===1&&sess.rpe===10){
+      const e=e1rm(w,reps,rpe), cur=S.maxes[MKEY[sess.ex]];
+      if(e>cur+1e-9)toast(`自己ベスト更新！ 推定1RM ${fmt(e)}kg（MAX +${fmt(e-cur)}kg）`);
+    }
   });
   $('sessions').querySelectorAll('[data-clear]').forEach(b=>b.onclick=()=>{
     delete S.logs[b.dataset.clear]; save(); renderWorkout();
   });
+  $('sessions').querySelectorAll('[data-next]').forEach(b=>b.onclick=startNextCycle);
 }
 
 function renderHead(){
   const total=PROGRAM.length;
   const done=PROGRAM.filter(s=>(S.sets[s.id]||[]).filter(Boolean).length>=s.sets).length;
-  $('headSub').textContent=`セッション ${done} / ${total} 完了 ・ 丸め ${S.round>0?fmt(S.round)+'kg':'なし'} ・ ${S.adaptive?'実績反映ON':'計画固定'}`;
+  $('headSub').textContent=`サイクル${S.cycle.n} ・ セッション ${done} / ${total} 完了 ・ 丸め ${S.round>0?fmt(S.round)+'kg':'なし'} ・ ${S.adaptive?'実績反映ON':'計画固定'}`;
 }
 
 /* ============ 進捗画面 ============ */
@@ -525,6 +596,66 @@ function renderProgress(){
       svg+=`<circle cx="${X(i)}" cy="${Y(p.ae)}" r="4" fill="var(--actual)"/>`;
   });
   $('chart').innerHTML=svg;
+
+  /* 週間ボリューム（Excel I・J列の週合計/全種目） */
+  const vw=Array.from({length:12},()=>({tot:0,adj:0}));
+  for(const s of PROGRAM){
+    const wg=plan.W[s.id], vol=wg*s.reps*s.sets;
+    vw[s.week-1].tot+=vol;
+    vw[s.week-1].adj+=vol*Math.pow(s.rpe/10,2)*Math.pow(wg/e1rm(wg,s.reps,s.rpe),2);
+  }
+  {
+    const Wv=340,Hv=170,pv={l:34,r:8,t:10,b:20};
+    const vmax=Math.max(...vw.map(v=>v.tot))*1.05;
+    const Yv=v=>Hv-pv.b-(Hv-pv.t-pv.b)*(v/vmax);
+    const bw=(Wv-pv.l-pv.r)/12, y0=Hv-pv.b;
+    let sv='';
+    for(let g=0;g<4;g++){
+      const v=vmax*g/3, y=Yv(v);
+      sv+=`<line x1="${pv.l}" y1="${y}" x2="${Wv-pv.r}" y2="${y}" stroke="#2A323D" stroke-width="1"/>
+        <text x="${pv.l-4}" y="${y+3}" fill="#8B94A0" font-size="9" text-anchor="end">${v>=1000?(v/1000).toFixed(1)+'k':Math.round(v)}</text>`;
+    }
+    vw.forEach((v,i)=>{
+      const bx=pv.l+bw*(i+0.5);
+      sv+=`<rect x="${(bx-bw*.31).toFixed(1)}" y="${Yv(v.tot).toFixed(1)}" width="${(bw*.62).toFixed(1)}" height="${(y0-Yv(v.tot)).toFixed(1)}" fill="#3A4450" rx="2"/>
+        <rect x="${(bx-bw*.15).toFixed(1)}" y="${Yv(v.adj).toFixed(1)}" width="${(bw*.3).toFixed(1)}" height="${(y0-Yv(v.adj)).toFixed(1)}" fill="var(--accent)" rx="2"/>
+        <text x="${bx.toFixed(1)}" y="${Hv-6}" fill="#8B94A0" font-size="8" text-anchor="middle">${i+1}</text>`;
+    });
+    $('volChart').innerHTML=sv;
+  }
+
+  /* サイクルごとのMAX推移（履歴がある場合のみ） */
+  const hist=S.history.filter(h=>h.maxesStart&&typeof h.maxesStart[MKEY[ex]]==='number');
+  if(hist.length===0){$('cycleBox').style.display='none';}
+  else{
+    $('cycleBox').style.display='';
+    const key=MKEY[ex];
+    const cpts=hist.map(h=>({lbl:'C'+h.n,v:h.maxesStart[key]}));
+    cpts.push({lbl:'C'+S.cycle.n,v:S.maxes[key]});
+    const cb=cycleBest()[ex];
+    if(cb!==null)cpts.push({lbl:'今',v:cb,act:true});
+    const d=S.maxes[key]-cpts[0].v;
+    $('cycleTitle').textContent=`${EX[ex]} — サイクルごとのMAX推移（通算 ${d>=0?'+':''}${fmt(d)}kg）`;
+    const Wc=340,Hc=170,pc={l:34,r:14,t:16,b:20};
+    const vs=cpts.map(p=>p.v);
+    let cmin=Math.min(...vs),cmax=Math.max(...vs);
+    const csp=Math.max(cmax-cmin,4); cmin-=csp*.15; cmax+=csp*.15;
+    const Xc=i=>pc.l+(Wc-pc.l-pc.r)*(cpts.length===1?0.5:i/(cpts.length-1));
+    const Yc=v=>Hc-pc.b-(Hc-pc.t-pc.b)*((v-cmin)/(cmax-cmin));
+    let sc='';
+    for(let g=0;g<4;g++){
+      const v=cmin+(cmax-cmin)*g/3, y=Yc(v);
+      sc+=`<line x1="${pc.l}" y1="${y}" x2="${Wc-pc.r}" y2="${y}" stroke="#2A323D" stroke-width="1"/>
+        <text x="${pc.l-4}" y="${y+3}" fill="#8B94A0" font-size="9" text-anchor="end">${Math.round(v)}</text>`;
+    }
+    sc+=`<polyline fill="none" stroke="var(--accent)" stroke-width="2" points="${cpts.map((p,i)=>Xc(i)+','+Yc(p.v)).join(' ')}"/>`;
+    cpts.forEach((p,i)=>{
+      sc+=`<circle cx="${Xc(i)}" cy="${Yc(p.v)}" r="4" fill="${p.act?'var(--actual)':'var(--accent)'}"/>
+        <text x="${Xc(i)}" y="${Hc-6}" fill="#8B94A0" font-size="9" text-anchor="middle">${p.lbl}</text>
+        <text x="${Xc(i)}" y="${Yc(p.v)-8}" fill="${p.act?'var(--actual)':'#EAECE6'}" font-size="9" text-anchor="middle">${fmt(p.v)}</text>`;
+    });
+    $('cycleChart').innerHTML=sc;
+  }
 }
 
 /* ============ 設定画面 ============ */
@@ -539,6 +670,7 @@ function renderSettings(){
     `<button class="opt ${S.bar===bk?'sel':''}" data-b="${bk}">${bk} kg</button>`).join('');
   $('barOpts').querySelectorAll('.opt').forEach(b=>b.onclick=()=>{S.bar=+b.dataset.b;save();renderAll();});
   $('adaptiveSw').className='sw'+(S.adaptive?' on':'');
+  $('cycleInfo').textContent=`現在: サイクル${S.cycle.n}（${new Date(S.cycle.started).toLocaleDateString('ja-JP')}〜）${S.history.length?` ・ 完了 ${S.history.length}サイクル`:''}`;
 }
 ['maxBP','maxNR','maxLG'].forEach((id,i)=>{
   $(id).addEventListener('change',e=>{
@@ -563,9 +695,10 @@ $('importFile').onchange=e=>{
   rd.readAsText(f); e.target.value='';
 };
 $('btnReset').onclick=()=>{
-  if(!confirm('セットのチェックと実績記録をすべて削除します。MAX・設定は残ります。よろしいですか？'))return;
+  if(!confirm('セットのチェックと実績記録をすべて削除します。MAX・設定・サイクル履歴は残ります。よろしいですか？'))return;
   S.sets={};S.logs={};save();renderAll();toast('記録をリセットしました');
 };
+$('btnNextCycle').onclick=startNextCycle;
 
 /* ============ ナビ／共通 ============ */
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
