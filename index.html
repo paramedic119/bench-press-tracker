@@ -103,6 +103,7 @@ header .sub{font-size:.7rem;color:var(--muted);margin-top:2px}
 .logclear{width:100%;padding:8px;margin-top:6px;border-radius:10px;border:1px solid var(--line);
   background:transparent;color:var(--muted);font-size:.75rem}
 .logresult{font-size:.75rem;color:var(--actual);margin:4px 0 8px}
+.donedate{font-size:.75rem;color:var(--ok);margin:4px 0 8px}
 .setlog{display:flex;align-items:center;gap:3px;margin-bottom:8px;flex-wrap:wrap}
 .setlog .setno{width:16px;text-align:center;color:var(--muted);font-size:1rem;flex-shrink:0}
 /* − / ＋ ステッパー（重量・回数） */
@@ -136,7 +137,7 @@ header .sub{font-size:.7rem;color:var(--muted);margin-top:2px}
 .statgrid{display:flex;gap:10px;margin-bottom:14px}
 .stat{flex:1;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px}
 .stat .lbl{font-size:.65rem;color:var(--muted)}
-.stat .val{font-size:1.9rem;line-height:1.1;margin-top:2px}
+.stat .val{font-size:1.65rem;line-height:1.1;margin-top:2px;white-space:nowrap}
 .stat .val small{font-size:.85rem;color:var(--muted)}
 .stat .delta{font-size:.7rem;color:var(--ok);margin-top:2px}
 .extabs{display:flex;gap:8px;margin-bottom:12px}
@@ -323,6 +324,15 @@ const bestE1=id=>{
 };
 /* e1RMから 目標回数@目標RPE に対する重量を逆算（e1RM式の逆関数） */
 const suggestW=(e,reps,rpe)=>(reps===1&&rpe===10)?e:e*33/(33+reps+10-rpe);
+/* セッションの記録日時 = セット✓とログの最新タイムスタンプ（旧データはnull） */
+const sessDate=id=>{
+  let t=0;
+  for(const v of (S.sets[id]||[])) if(typeof v==='number'&&v>t)t=v;
+  const a=S.logs[id];
+  if(Array.isArray(a)) for(const x of a) if(x&&x.t>t)t=x.t;
+  return t||null;
+};
+const fmtDate=t=>{const d=new Date(t);return `${d.getMonth()+1}/${d.getDate()}`;};
 
 /* ============ サイクル管理 ============ */
 const MKEY={BP:'MB',NR:'MN',LG:'ML'};
@@ -463,8 +473,8 @@ function renderWorkout(){
         rows+=`<div class="suggest">→ 次セット推奨 <b>${fmt(nw)}kg</b>${Math.abs(diff)>=0.01?`（${diff>0?'+':''}${fmt(diff)}kg）`:'（維持）'}・e1RM ${fmt(e)}</div>`;
       }
     }
-    const be=bestE1(s.id);
-    const logRes=be!==null?`本日ベスト e1RM <b>${fmt(be)}kg</b>${S.adaptive?' → 以降のセッションに反映中':''}`:'';
+    const be=bestE1(s.id), dt=sessDate(s.id);
+    const logRes=be!==null?`${dt?fmtDate(dt)+' ・ ':''}ベスト e1RM <b>${fmt(be)}kg</b>${S.adaptive?' → 以降のセッションに反映中':''}`:'';
     /* ボリューム（Excel I列）と補正ボリューム（J列）: 丸め前の計画値で計算 */
     const vol=raw*s.reps*s.sets;
     const adj=vol*Math.pow(s.rpe/10,2)*Math.pow(raw/e1rm(raw,s.reps,s.rpe),2);
@@ -481,6 +491,7 @@ function renderWorkout(){
       <div class="plates">${plateHTML(w)}</div>
       <div class="sets">${setsHtml}</div>
       ${logRes?`<div class="logresult">${logRes}</div>`:''}
+      ${!logRes&&done&&dt?`<div class="donedate">${fmtDate(dt)} 完了</div>`:''}
       <button class="logtoggle ${hasLog?'has':''}" data-log="${s.id}">${hasLog?'セット記録を編集':'セット毎に記録（任意）'}</button>
       <div class="logarea ${hasLog&&!done?'open':''}" id="log-${s.id}">
         <div class="loghead"><span class="h-no"></span><span class="h-w">重量 kg</span><span class="h-r">回数</span><span class="h-p">RPE</span><span class="h-ok"></span></div>
@@ -494,7 +505,9 @@ function renderWorkout(){
   /* handlers */
   $('sessions').querySelectorAll('.setbtn').forEach(b=>b.onclick=()=>{
     const id=b.dataset.sid,i=+b.dataset.i;
-    S.sets[id]=S.sets[id]||[]; S.sets[id][i]=!S.sets[id][i]; save(); renderWorkout(); renderHead();
+    S.sets[id]=S.sets[id]||[];
+    S.sets[id][i]=S.sets[id][i]?false:Date.now(); // ✓に日時を保存（truthyなので既存判定はそのまま）
+    save(); renderWorkout(); renderHead();
   });
   $('sessions').querySelectorAll('.logtoggle').forEach(b=>b.onclick=()=>
     $('log-'+b.dataset.log).classList.toggle('open'));
@@ -526,8 +539,8 @@ function renderWorkout(){
     }
     const w=+$(`lw-${id}-${i}`).value, reps=+$(`lr-${id}-${i}`).value, rpe=+$(`lp-${id}-${i}`).value;
     if(!(w>0&&reps>0&&rpe>=5&&rpe<=10)){toast('重量・回数・RPE(5〜10)を確認してください');return;}
-    logs[i]={w,reps,rpe}; S.logs[id]=logs;
-    S.sets[id]=S.sets[id]||[]; S.sets[id][i]=true; // チェックも連動
+    logs[i]={w,reps,rpe,t:Date.now()}; S.logs[id]=logs;
+    S.sets[id]=S.sets[id]||[]; S.sets[id][i]=Date.now(); // チェックも連動
     save(); renderWorkout(); renderHead();
     /* テスト日(1rep@RPE10)の記録が現MAXを超えたら自己ベスト通知 */
     const sess=PROGRAM.find(x=>x.id===+id);
@@ -563,12 +576,21 @@ function renderProgress(){
   const startMax=S.maxes[ex==='BP'?'MB':ex==='NR'?'MN':'ML'];
   const actuals=pts.filter(p=>p.ae!==null);
   const current=actuals.length?actuals[actuals.length-1].ae:null;
+  const curDate=actuals.length?sessDate(actuals[actuals.length-1].s.id):null;
   const peak=Math.max(...pts.map(p=>p.pe));
+  /* 週3ペース: 今週(月曜始まり)に記録したトレ日数と、前回からの経過日数（全種目） */
+  const dts=PROGRAM.map(s=>sessDate(s.id)).filter(Boolean);
+  const lastT=dts.length?Math.max(...dts):null;
+  const mon=new Date(); mon.setHours(0,0,0,0); mon.setDate(mon.getDate()-((mon.getDay()+6)%7));
+  const wkDays=new Set(PROGRAM.filter(s=>{const t=sessDate(s.id);return t&&t>=mon.getTime();}).map(s=>s.week+'-'+s.day)).size;
+  const gap=lastT!==null?Math.floor((Date.now()-lastT)/864e5):null;
   $('statgrid').innerHTML=`
     <div class="stat"><div class="lbl">開始MAX</div><div class="val num">${fmt(startMax)}<small> kg</small></div></div>
     <div class="stat"><div class="lbl">${current!==null?'直近の実績e1RM':'計画ピークe1RM'}</div>
       <div class="val num" style="color:${current!==null?'var(--actual)':'var(--accent)'}">${fmt(current!==null?current:peak)}<small> kg</small></div>
-      ${current!==null?`<div class="delta">${current>=startMax?'+':''}${fmt(current-startMax)} kg</div>`:''}</div>`;
+      ${current!==null?`<div class="delta">${current>=startMax?'+':''}${fmt(current-startMax)} kg${curDate?` ・ ${fmtDate(curDate)}`:''}</div>`:''}</div>
+    <div class="stat"><div class="lbl">今週</div><div class="val num">${wkDays}<small> /3日</small></div>
+      ${gap!==null?`<div class="delta"${gap>=4?' style="color:#E8C531"':''}>前回から${gap}日</div>`:''}</div>`;
   $('chartTitle').textContent=`${EX[ex]} — 推定1RMの推移（全${pts.length}セッション）`;
 
   /* SVG chart */
