@@ -70,6 +70,14 @@ header .sub{font-size:.7rem;color:var(--muted);margin-top:2px}
 .bigw .scheme .rs{font-size:1.5rem;line-height:1}
 .bigw .scheme .rpe{font-size:.7rem;color:var(--muted)}
 .raww{font-size:.68rem;color:var(--muted);margin-bottom:8px}
+/* ボリューム（計画 / 実際に積んだ重さ） */
+.volbox{margin-bottom:8px}
+.volbox div{font-size:.68rem;line-height:1.6}
+.volbox .vp{color:var(--muted)}
+.volbox .va{color:var(--actual)}
+.volbox .va b,.dayvol b{font-family:'Bebas Neue',sans-serif;font-size:.95rem;letter-spacing:.05em;font-weight:400}
+.dayvol{font-size:.7rem;color:var(--muted);margin:-4px 2px 10px;line-height:1.6}
+.dayvol b{color:var(--actual)}
 
 /* plates */
 .plates{display:flex;align-items:center;gap:3px;margin:8px 0 10px;min-height:34px}
@@ -143,7 +151,7 @@ header .sub{font-size:.7rem;color:var(--muted);margin-top:2px}
 .extabs{display:flex;gap:8px;margin-bottom:12px}
 .chartbox{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px}
 .chartbox h3{font-size:.75rem;color:var(--muted);font-weight:500;margin-bottom:6px}
-.legend{display:flex;gap:14px;font-size:.68rem;color:var(--muted);margin-top:8px}
+.legend{display:flex;flex-wrap:wrap;gap:5px 14px;font-size:.68rem;color:var(--muted);margin-top:8px}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
 
 /* settings */
@@ -170,6 +178,9 @@ header .sub{font-size:.7rem;color:var(--muted);margin-top:2px}
   color:#14100C;font-weight:700;font-size:.85rem;margin-top:10px}
 .chartbox+.chartbox{margin-top:12px}
 .chartnote{font-size:.62rem;color:var(--muted);margin-top:6px;line-height:1.5}
+.volsum{font-size:.72rem;color:var(--text);margin-top:10px;line-height:1.7}
+.volsum b{color:var(--actual);font-family:'Bebas Neue',sans-serif;font-size:1.15rem;letter-spacing:.05em;font-weight:400}
+.volsum small{display:block;color:var(--muted);font-size:.66rem}
 
 /* tabbar */
 nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:rgba(15,18,22,.96);
@@ -196,6 +207,7 @@ nav button.sel{color:var(--accent)}
   <div class="weekstrip" id="weekstrip"></div>
   <div class="weeklabel" id="weeklabel"></div>
   <div class="daytabs" id="daytabs"></div>
+  <div class="dayvol" id="dayvol"></div>
   <div id="sessions"></div>
 </div>
 
@@ -211,13 +223,16 @@ nav button.sel{color:var(--accent)}
     </div>
   </div>
   <div class="chartbox">
-    <h3>週間ボリューム — 全種目・計画値</h3>
+    <h3>週間ボリューム — 全種目・計画 vs 実際に積んだ重さ</h3>
     <svg id="volChart" width="100%" height="170" viewBox="0 0 340 170" preserveAspectRatio="none"></svg>
     <div class="legend">
-      <span><i style="background:#3A4450"></i>総ボリューム</span>
-      <span><i style="background:var(--accent)"></i>補正ボリューム</span>
+      <span><i style="background:#3A4450"></i>計画 総Vol</span>
+      <span><i style="background:var(--accent)"></i>計画 補正Vol</span>
+      <span><i style="background:#2F4A63"></i>実績 総Vol</span>
+      <span><i style="background:var(--actual)"></i>実績 補正Vol</span>
     </div>
-    <div class="chartnote">補正ボリューム = 重量×回数×セット数×(RPE/10)²×(重量/e1RM)²（ExcelのI・J列）。テスト週(4/8/12)で疲労が抜ける波形が見えます。</div>
+    <div class="volsum" id="volSummary"></div>
+    <div class="chartnote">各週の左が計画、右が実際に積んだ重さ。実績Vol = 記録した重量×回数の合計。セット✓だけで重量未記録のセットは、その日の計画重量で換算します。補正Vol = Vol×(RPE/10)²×(重量/e1RM)²（ExcelのI・J列）。テスト週(4/8/12)で疲労が抜ける波形が見えます。</div>
   </div>
   <div class="chartbox" id="cycleBox" style="display:none">
     <h3 id="cycleTitle">サイクルごとのMAX推移</h3>
@@ -384,6 +399,29 @@ function computePlan(){
 const roundW=w=>S.round>0?Math.round(w/S.round)*S.round:Math.round(w*100)/100;
 const fmt=(v,d=1)=>{const n=+v;return Number.isInteger(n)?String(n):n.toFixed(d)};
 
+/* ============ ボリューム（Excel I・J列） ============ */
+/* 補正係数 J列 = (RPE/10)² × (重量/e1RM)² */
+const adjF=(w,reps,rpe)=>Math.pow(rpe/10,2)*Math.pow(w/e1rm(w,reps,rpe),2);
+/* 計画ボリューム: 丸め前の計画重量 × 回数 × セット数 */
+const planVol=(w,s)=>{const tot=w*s.reps*s.sets;return{tot,adj:tot*adjF(w,s.reps,s.rpe)};};
+/* 実績ボリューム = 実際に積んだ重さ。
+   記録セットは実値、セット✓のみ（重量未記録）は計画重量×計画回数で換算する。 */
+const actVol=(s,planW)=>{
+  const logs=Array.isArray(S.logs[s.id])?S.logs[s.id]:[], chk=S.sets[s.id]||[];
+  let tot=0,adj=0,logged=0,est=0;
+  for(let i=0;i<s.sets;i++){
+    const lg=logs[i];
+    if(lg&&lg.w>0&&lg.reps>0){
+      const v=lg.w*lg.reps; tot+=v; adj+=v*adjF(lg.w,lg.reps,lg.rpe); logged++;
+    }else if(chk[i]&&planW>0){
+      const v=planW*s.reps; tot+=v; adj+=v*adjF(planW,s.reps,s.rpe); est++;
+    }
+  }
+  return {tot,adj,logged,est,sets:logged+est};
+};
+const fmtVol=v=>Math.round(v).toLocaleString();
+const pct=(a,b)=>b>0?Math.round(a/b*100):0;
+
 /* ============ プレート計算 ============ */
 const PLATES=[[25,'p25'],[20,'p20'],[15,'p15'],[10,'p10'],[5,'p5'],[2.5,'p2_5'],[1.25,'p1_25']];
 function plateHTML(total){
@@ -429,6 +467,18 @@ function renderWorkout(){
 
   /* sessions */
   const list=PROGRAM.filter(s=>s.week===S.ui.week&&s.day===S.ui.day);
+
+  /* その日に実際に積んだ重さの合計 */
+  {
+    let pt=0,at=0,est=0,ds=0,ts=0;
+    for(const s of list){
+      const rw=plan.W[s.id], a=actVol(s,roundW(rw));
+      pt+=planVol(rw,s).tot; at+=a.tot; est+=a.est; ds+=a.sets; ts+=s.sets;
+    }
+    $('dayvol').innerHTML = at>0
+      ? `Day ${S.ui.day} 実際に積んだ重さ <b>${fmtVol(at)}</b> kg ・ 計画 ${fmtVol(pt)}kg の ${pct(at,pt)}% ・ ${ds}/${ts}set${est?` ・ 未記録${est}setは計画重量で換算`:''}`
+      : `Day ${S.ui.day} 計画Vol ${fmtVol(pt)}kg ・ セットを記録すると実際に積んだ重さを集計します`;
+  }
   $('sessions').innerHTML=list.map(s=>{
     const raw=plan.W[s.id], w=roundW(raw);
     const logs=Array.isArray(S.logs[s.id])?S.logs[s.id]:[];
@@ -475,9 +525,8 @@ function renderWorkout(){
     }
     const be=bestE1(s.id), dt=sessDate(s.id);
     const logRes=be!==null?`${dt?fmtDate(dt)+' ・ ':''}ベスト e1RM <b>${fmt(be)}kg</b>${S.adaptive?' → 以降のセッションに反映中':''}`:'';
-    /* ボリューム（Excel I列）と補正ボリューム（J列）: 丸め前の計画値で計算 */
-    const vol=raw*s.reps*s.sets;
-    const adj=vol*Math.pow(s.rpe/10,2)*Math.pow(raw/e1rm(raw,s.reps,s.rpe),2);
+    /* ボリューム: 計画（Excel I・J列/丸め前）と、実際に積んだ重さの実績 */
+    const pvol=planVol(raw,s), avol=actVol(s,w);
     return `<div class="card ${done?'completed':''}">
       ${test?'<span class="testbadge">MAX TEST</span>':''}
       <div class="exrow"><span class="ex">${EX[s.ex]}</span>
@@ -487,7 +536,10 @@ function renderWorkout(){
         <span class="scheme"><span class="rs num">${s.reps}×${s.sets}</span><br><span class="rpe">@RPE ${fmt(s.rpe)}</span></span>
       </div>
       ${S.round>0&&Math.abs(w-raw)>0.01?`<div class="raww">計算値 ${raw.toFixed(1)}kg → ${fmt(S.round)}kg刻みに丸め</div>`:''}
-      <div class="raww">総Vol ${Math.round(vol).toLocaleString()}kg ・ 補正Vol ${Math.round(adj).toLocaleString()}kg</div>
+      <div class="volbox">
+        <div class="vp">計画Vol ${fmtVol(pvol.tot)}kg ・ 補正Vol ${fmtVol(pvol.adj)}kg</div>
+        ${avol.sets?`<div class="va">実績Vol <b>${fmtVol(avol.tot)}</b>kg ・ 計画比 ${pct(avol.tot,pvol.tot)}% ・ ${avol.sets}/${s.sets}set${avol.est?`（未記録${avol.est}setは計画重量で換算）`:''}</div>`:''}
+      </div>
       <div class="plates">${plateHTML(w)}</div>
       <div class="sets">${setsHtml}</div>
       ${logRes?`<div class="logresult">${logRes}</div>`:''}
@@ -619,16 +671,16 @@ function renderProgress(){
   });
   $('chart').innerHTML=svg;
 
-  /* 週間ボリューム（Excel I・J列の週合計/全種目） */
-  const vw=Array.from({length:12},()=>({tot:0,adj:0}));
+  /* 週間ボリューム（Excel I・J列の週合計/全種目）＋ 実際に積んだ重さ */
+  const vw=Array.from({length:12},()=>({tot:0,adj:0,atot:0,aadj:0,est:0,sets:0,allsets:0}));
   for(const s of PROGRAM){
-    const wg=plan.W[s.id], vol=wg*s.reps*s.sets;
-    vw[s.week-1].tot+=vol;
-    vw[s.week-1].adj+=vol*Math.pow(s.rpe/10,2)*Math.pow(wg/e1rm(wg,s.reps,s.rpe),2);
+    const wg=plan.W[s.id], pl=planVol(wg,s), ac=actVol(s,roundW(wg)), v=vw[s.week-1];
+    v.tot+=pl.tot; v.adj+=pl.adj;
+    v.atot+=ac.tot; v.aadj+=ac.adj; v.est+=ac.est; v.sets+=ac.sets; v.allsets+=s.sets;
   }
   {
     const Wv=340,Hv=170,pv={l:34,r:8,t:10,b:20};
-    const vmax=Math.max(...vw.map(v=>v.tot))*1.05;
+    const vmax=Math.max(...vw.map(v=>Math.max(v.tot,v.atot)))*1.05;
     const Yv=v=>Hv-pv.b-(Hv-pv.t-pv.b)*(v/vmax);
     const bw=(Wv-pv.l-pv.r)/12, y0=Hv-pv.b;
     let sv='';
@@ -637,13 +689,23 @@ function renderProgress(){
       sv+=`<line x1="${pv.l}" y1="${y}" x2="${Wv-pv.r}" y2="${y}" stroke="#2A323D" stroke-width="1"/>
         <text x="${pv.l-4}" y="${y+3}" fill="#8B94A0" font-size="9" text-anchor="end">${v>=1000?(v/1000).toFixed(1)+'k':Math.round(v)}</text>`;
     }
+    /* 左=計画 / 右=実績 の2本組。各バーの内側の細いバーが補正Vol */
+    const vbar=(x,val,fill,r)=>`<rect x="${x.toFixed(1)}" y="${Yv(val).toFixed(1)}" width="${(bw*(r?.2:.4)).toFixed(1)}" height="${Math.max(0,y0-Yv(val)).toFixed(1)}" fill="${fill}" rx="${r?1.5:2}"/>`;
     vw.forEach((v,i)=>{
       const bx=pv.l+bw*(i+0.5);
-      sv+=`<rect x="${(bx-bw*.31).toFixed(1)}" y="${Yv(v.tot).toFixed(1)}" width="${(bw*.62).toFixed(1)}" height="${(y0-Yv(v.tot)).toFixed(1)}" fill="#3A4450" rx="2"/>
-        <rect x="${(bx-bw*.15).toFixed(1)}" y="${Yv(v.adj).toFixed(1)}" width="${(bw*.3).toFixed(1)}" height="${(y0-Yv(v.adj)).toFixed(1)}" fill="var(--accent)" rx="2"/>
-        <text x="${bx.toFixed(1)}" y="${Hv-6}" fill="#8B94A0" font-size="8" text-anchor="middle">${i+1}</text>`;
+      sv+=vbar(bx-bw*.44,v.tot,'#3A4450')+vbar(bx-bw*.34,v.adj,'var(--accent)',1);
+      if(v.atot>0) sv+=vbar(bx+bw*.04,v.atot,'#2F4A63')+vbar(bx+bw*.14,v.aadj,'var(--actual)',1);
+      sv+=`<text x="${bx.toFixed(1)}" y="${Hv-6}" fill="#8B94A0" font-size="8" text-anchor="middle">${i+1}</text>`;
     });
     $('volChart').innerHTML=sv;
+
+    /* サイクル累計 */
+    const c=vw.reduce((a,v)=>({p:a.p+v.tot,a:a.a+v.atot,e:a.e+v.est,s:a.s+v.sets,n:a.n+v.allsets}),
+      {p:0,a:0,e:0,s:0,n:0});
+    $('volSummary').innerHTML = c.a>0
+      ? `サイクル${S.cycle.n} 累計 実際に積んだ重さ <b>${fmtVol(c.a)}</b> kg
+         <small>計画 ${fmtVol(c.p)}kg の ${pct(c.a,c.p)}% ・ ${c.s}/${c.n}set 実施${c.e?` ・ うち未記録 ${c.e}set は計画重量で換算`:''}</small>`
+      : `<small>まだ実績がありません。セットを記録すると、実際に積んだ重さが週ごとに積み上がります。</small>`;
   }
 
   /* サイクルごとのMAX推移（履歴がある場合のみ） */
