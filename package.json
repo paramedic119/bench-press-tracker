@@ -1,15 +1,35 @@
 {
   "name": "bench-press-tracker",
-  "version": "1.0.0",
-  "description": "Bench Press Tracking App",
+  "version": "3.0.1",
+  "description": "BENCH 120 — 12週ベンチプレスプログラム（オフライン対応PWA）",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "node tools/build.mjs",
+    "watch": "node tools/build.mjs --watch",
+    "check": "tsc -p tsconfig.json && tsc -p tsconfig.sw.json",
+    "test": "node --test \"test/*.test.mjs\"",
+    "e2e": "node test/e2e.mjs",
+    "icons": "node tools/make-icons.mjs",
+    "serve": "node tools/serve.mjs",
+    "verify": "npm run check && npm test && npm run build",
+    "build:gas": "npm run build && node tools/build-gas.mjs"
   },
-  "keywords": [],
+  "keywords": [
+    "bench-press",
+    "strength-training",
+    "pwa",
+    "e1rm"
+  ],
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "@google/clasp": "^3.2.0"
-  }
+    "@google/clasp": "^3.2.0",
+    "axe-core": "^4.13.0",
+    "esbuild": "^0.28.2",
+    "lightningcss": "^1.33.0",
+    "playwright": "^1.62.1",
+    "typescript": "^5.9.3"
+  },
+  "private": true,
+  "type": "module"
 }
