@@ -203,6 +203,103 @@ describe('プレート計算', () => {
   });
 });
 
+describe('レップマックス（3RM / 5RM / 8RM）の推定', () => {
+  const day = (y, m, d) => new Date(y, m-1, d, 10).getTime();
+  const state = (logs, history = []) => C.migrate({maxes:{MB:110,MN:105,ML:100}, logs, history}, NOW);
+
+  test('1RMからの比率が実際のレップマックス表と近い', () => {
+    assert.equal(C.repMax(100, 1), 100);
+    assert.ok(Math.abs(C.repMax(100, 3) - 91.7) < 0.1, '3RM ≈ 92%');
+    assert.ok(Math.abs(C.repMax(100, 5) - 86.8) < 0.1, '5RM ≈ 87%');
+    assert.ok(Math.abs(C.repMax(100, 8) - 80.5) < 0.1, '8RM ≈ 80%');
+  });
+  test('回数が増えるほど推定重量は下がる', () => {
+    const v = C.REP_TARGETS.map(t => C.repMax(120, t));
+    for(let i = 1; i < v.length; i++) assert.ok(v[i] < v[i-1]);
+  });
+  test('repMax は e1rm の逆演算になっている', () => {
+    for(const t of C.REP_TARGETS){
+      const w = C.repMax(130, t);
+      assert.ok(Math.abs(C.e1rm(w, t, 10) - 130) < 1e-9, `${t}RM`);
+    }
+  });
+  test('推定に使う回数は目標±3レップまで', () => {
+    assert.ok(C.canEstimate(1, 3) && C.canEstimate(6, 3));
+    assert.ok(!C.canEstimate(8, 3), '8回のセットから3RMは出さない');
+    assert.ok(C.canEstimate(8, 5) && C.canEstimate(8, 8));
+    assert.ok(!C.canEstimate(1, 5) && !C.canEstimate(4, 8));
+  });
+
+  test('記録がなければ空', () => {
+    assert.deepEqual(C.repMaxSeries(state({}), 'BP'), []);
+    assert.deepEqual(C.latestRepMaxes([]), {});
+  });
+  test('日時のない古い記録は時系列に載せない', () => {
+    assert.deepEqual(C.repMaxSeries(state({6:[{w:100, reps:5, rpe:8}]}), 'BP'), []);
+  });
+  test('選んだ種目のセットだけを拾う', () => {
+    const st = state({6:[{w:100, reps:5, rpe:8, t:day(2026,1,5)}],    // BP
+                       7:[{w:80,  reps:5, rpe:8, t:day(2026,1,5)}]}); // NR
+    assert.equal(C.repMaxSeries(st, 'BP').length, 1);
+    assert.equal(C.repMaxSeries(st, 'NR').length, 1);
+    assert.equal(C.repMaxSeries(st, 'LG').length, 0);
+    assert.ok(C.repMaxSeries(st, 'BP')[0].rm[5] > C.repMaxSeries(st, 'NR')[0].rm[5]);
+  });
+  test('同じ日のセットは1点にまとめ、ベストを採る', () => {
+    const t = day(2026,1,5);
+    const sr = C.repMaxSeries(state({6:[{w:90, reps:5, rpe:8, t}, {w:100, reps:5, rpe:8, t:t+3e5}]}), 'BP');
+    assert.equal(sr.length, 1);
+    assert.equal(sr[0].sets, 2);
+    assert.ok(Math.abs(sr[0].rm[5] - C.repMax(C.e1rm(100,5,8), 5)) < 1e-9);
+  });
+  test('範囲外の回数からはその回数のマックスを出さない', () => {
+    const sr = C.repMaxSeries(state({19:[{w:80, reps:8, rpe:8, t:day(2026,1,5)}]}), 'BP');
+    assert.equal(sr[0].rm[3], undefined, '8回のセットから3RMは出さない');
+    assert.ok(sr[0].rm[5] !== undefined);
+    assert.ok(sr[0].rm[8] !== undefined);
+  });
+  test('日付の古い順に並ぶ', () => {
+    const sr = C.repMaxSeries(state({
+      6: [{w:100, reps:5, rpe:8, t:day(2026,1,20)}],
+      12:[{w:95,  reps:5, rpe:8, t:day(2026,1,6)}],
+      19:[{w:97,  reps:5, rpe:8, t:day(2026,1,13)}]}), 'BP');
+    assert.deepEqual(sr.map(p => p.key), ['2026-01-06', '2026-01-13', '2026-01-20']);
+  });
+  test('過去サイクルの記録も含めて1本の時系列になる', () => {
+    const st = state({6:[{w:105, reps:5, rpe:8, t:day(2026,1,20)}]},
+      [{n:1, started:0, ended:day(2025,12,20), maxesStart:{MB:100,MN:95,ML:90},
+        logs:{6:[{w:90, reps:5, rpe:8, t:day(2025,12,1)}]}, sets:{}}]);
+    const sr = C.repMaxSeries(st, 'BP');
+    assert.equal(sr.length, 2);
+    assert.deepEqual(sr.map(p => p.key), ['2025-12-01', '2026-01-20']);
+    assert.ok(sr[1].rm[5] > sr[0].rm[5], '伸びが時系列で見える');
+  });
+  test('latestRepMaxes は最新・初回・ベストを返す', () => {
+    const sr = C.repMaxSeries(state({
+      6: [{w:90,  reps:5, rpe:8, t:day(2026,1,6)}],
+      12:[{w:110, reps:5, rpe:8, t:day(2026,1,13)}],   // ここがベスト
+      19:[{w:100, reps:5, rpe:8, t:day(2026,1,20)}]}), 'BP');
+    const st = C.latestRepMaxes(sr)[5];
+    assert.equal(st.n, 3);
+    assert.ok(Math.abs(st.first - C.repMax(C.e1rm(90,5,8), 5)) < 1e-9);
+    assert.ok(Math.abs(st.current - C.repMax(C.e1rm(100,5,8), 5)) < 1e-9);
+    assert.ok(Math.abs(st.best - C.repMax(C.e1rm(110,5,8), 5)) < 1e-9);
+    assert.ok(st.best > st.current && st.current > st.first);
+  });
+  test('データのない回数はキーごと入らない', () => {
+    const sr = C.repMaxSeries(state({19:[{w:80, reps:8, rpe:8, t:day(2026,1,5)}]}), 'BP');
+    const st = C.latestRepMaxes(sr);
+    assert.equal(st[3], undefined);
+    assert.ok(st[5] && st[8]);
+  });
+  test('12週プログラムには3RM/5RM/8RMすべての推定元になる回数がある', () => {
+    for(const ex of ['BP','NR','LG'])
+      for(const target of C.REP_TARGETS)
+        assert.ok(C.PROGRAM.some(s => s.ex === ex && C.canEstimate(s.reps, target)),
+          `${ex} に ${target}RM を推定できるセッションがない`);
+  });
+});
+
 describe('プレート在庫（最小プレート設定）', () => {
   test('既定は1.25kgまで', () => {
     assert.deepEqual(C.platesFor(1.25), [25, 20, 15, 10, 5, 2.5, 1.25]);

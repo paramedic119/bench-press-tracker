@@ -111,6 +111,18 @@ const watch = page => {
     await p.locator(`nav [data-page="${tab}"]`).click(); await p.waitForTimeout(300);
     ok(`${tab} が描画される`, await p.locator(sel).count() > 0);
   }
+
+  /* レップマックス: 記録が無ければ空状態、記録すると3本の線が出る */
+  await p.locator('nav [data-page="progress"]').click(); await p.waitForTimeout(300);
+  ok('記録がなければレップマックスは空状態',
+     !(await p.locator('#rmEmpty').isHidden()) && await p.locator('#rmChart').isHidden());
+  await p.locator('nav [data-page="workout"]').click(); await p.waitForTimeout(300);
+  await p.locator('.card').first().locator('.logtoggle').click(); await p.waitForTimeout(150);
+  await p.locator('[data-slog="6"][data-i="0"]').click(); await p.waitForTimeout(250);
+  await p.locator('nav [data-page="progress"]').click(); await p.waitForTimeout(350);
+  ok('記録するとレップマックスが描画される',
+     (await p.locator('#rmEmpty').isHidden()) && await p.locator('#rmRow .rmcell').count() === 3,
+     (await p.locator('#rmRow').textContent()).replace(/\s+/g, ' ').trim());
   await p.locator('#themeOpts .opt', {hasText:'ライト'}).click(); await p.waitForTimeout(250);
   ok('ライトテーマに切り替わる', await p.evaluate(() => document.documentElement.dataset.theme) === 'light'
     && await p.locator('#metaTheme').getAttribute('content') === '#F4F5F3');
