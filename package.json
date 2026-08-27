@@ -1,15 +1,25 @@
 {
   "name": "bench-press-tracker",
-  "version": "1.0.0",
-  "description": "Bench Press Tracking App",
+  "version": "2.0.0",
+  "description": "BENCH 120 — 12週ベンチプレスプログラム（オフライン対応PWA）",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --test \"test/*.test.mjs\"",
+    "icons": "node tools/make-icons.mjs",
+    "serve": "python3 -m http.server 8080",
+    "e2e": "node test/e2e.mjs"
   },
-  "keywords": [],
+  "keywords": [
+    "bench-press",
+    "strength-training",
+    "pwa",
+    "e1rm"
+  ],
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "@google/clasp": "^3.2.0"
-  }
+    "@google/clasp": "^3.2.0",
+    "playwright": "^1.62.1"
+  },
+  "private": true
 }

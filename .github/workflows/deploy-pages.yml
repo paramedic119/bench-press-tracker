@@ -4,6 +4,8 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [master]
+  pull_request:
+    branches: [master]
   workflow_dispatch:
 
 permissions:
@@ -17,7 +19,28 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # 計算ロジックのテスト。落ちたらデプロイしない。
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Unit tests
+        run: npm test
+      - name: アイコンが最新か（tools/make-icons.mjs の出力と一致するか）
+        run: |
+          npm run icons
+          if ! git diff --quiet -- icons; then
+            echo "::error::icons/ がソースと一致しません。'npm run icons' を実行してコミットしてください。"
+            git diff --stat -- icons
+            exit 1
+          fi
+
   deploy:
+    needs: test
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -26,10 +49,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Prepare site (自己完結の index.html のみ公開)
+      - name: Prepare site (PWA一式を公開)
         run: |
           mkdir -p _site
-          cp index.html _site/index.html
+          cp index.html manifest.webmanifest sw.js _site/
+          cp -r icons _site/icons
+          touch _site/.nojekyll
+          ls -R _site
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
