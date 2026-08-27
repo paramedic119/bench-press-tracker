@@ -149,7 +149,64 @@ const watch = page => {
   await ctx.close();
 }
 
-/* ---------- 5. アクセシビリティ（axe-core） ---------- */
+/* ---------- 5. 状態の差し替え（取り消し・読み込み） ---------- */
+{
+  const ctx = await newCtx({...SEED, ui:{week:1, day:1, ex:'BP'},
+                            notes:{'1-1': {text:'元のメモ', bw:80, t:1}}});
+  const p = await ctx.newPage(); watch(p);
+  await p.goto(BASE, {waitUntil:'domcontentloaded'}); await p.waitForTimeout(400);
+  ok('メモが復元される', await p.locator('#noteText').inputValue() === '元のメモ');
+
+  /* 同じ週・日のまま、別のメモを持つバックアップを読み込む。
+     ノートカードは週・日が同じだと作り直さない最適化があるため、
+     状態の差し替えが画面へ伝わるかをここで見る。 */
+  await p.locator('nav [data-page="settings"]').click(); await p.waitForTimeout(250);
+  await p.evaluate(() => {
+    const s = JSON.parse(localStorage.getItem('bench120.v1'));
+    s.notes = {'1-1': {text:'読み込んだメモ', bw:72, t:2}};
+    const dt = new DataTransfer();
+    dt.items.add(new File([JSON.stringify(s)], 'b.json', {type:'application/json'}));
+    const input = /** @type {HTMLInputElement} */ (document.getElementById('importFile'));
+    input.files = dt.files;
+    input.dispatchEvent(new Event('change'));
+  });
+  await p.waitForTimeout(400);
+  await p.locator('#scrim .b-ok').click(); await p.waitForTimeout(500);
+  await p.locator('nav [data-page="workout"]').click(); await p.waitForTimeout(400);
+  ok('読み込み後、画面のメモも入れ替わる',
+     await p.locator('#noteText').inputValue() === '読み込んだメモ',
+     await p.locator('#noteText').inputValue());
+  ok('体重も入れ替わる', await p.locator('#noteBw').inputValue() === '72');
+  await ctx.close();
+}
+
+/* ---------- 6. 壊れたバックアップからの復帰 ---------- */
+{
+  const ctx = await newCtx(SEED);
+  const p = await ctx.newPage(); watch(p);
+  await p.goto(BASE, {waitUntil:'domcontentloaded'}); await p.waitForTimeout(400);
+  await p.locator('nav [data-page="settings"]').click(); await p.waitForTimeout(250);
+  await p.evaluate(() => {
+    const broken = {maxes:{MB:110, MN:105, ML:100},
+      history:[{n:1, started:0, ended:0, maxesStart:{MB:'x'}, sets:{6:{壊れた:'形'}}, logs:{6:'文字列'}}],
+      sets:{6:'配列じゃない'}, logs:{7:{w:'x'}}, ui:{week:99, day:9}};
+    const dt = new DataTransfer();
+    dt.items.add(new File([JSON.stringify(broken)], 'broken.json', {type:'application/json'}));
+    const input = /** @type {HTMLInputElement} */ (document.getElementById('importFile'));
+    input.files = dt.files;
+    input.dispatchEvent(new Event('change'));
+  });
+  await p.waitForTimeout(400);
+  if(await p.locator('#scrim.show').count()){ await p.locator('#scrim .b-ok').click(); await p.waitForTimeout(500); }
+  for(const tab of ['workout', 'progress', 'history', 'settings']){
+    await p.locator(`nav [data-page="${tab}"]`).click(); await p.waitForTimeout(250);
+    ok(`壊れたデータでも ${tab} が描画される`,
+       await p.locator(`#page-${tab}`).evaluate(e => e.textContent.trim().length > 20));
+  }
+  await ctx.close();
+}
+
+/* ---------- 7. アクセシビリティ（axe-core） ---------- */
 {
   const axeSource = await readFile(createRequire(import.meta.url).resolve('axe-core/axe.min.js'), 'utf8');
   const ctx = await newCtx(SEED);
@@ -171,7 +228,7 @@ const watch = page => {
   await ctx.close();
 }
 
-/* ---------- 6. レイアウト（狭い端末・両テーマ） ---------- */
+/* ---------- 8. レイアウト（狭い端末・両テーマ） ---------- */
 for(const theme of ['dark', 'light']){
   for(const width of [320, 390, 430]){
     const ctx = await newCtx({...SEED, theme}, {viewport: {width, height: 780}});

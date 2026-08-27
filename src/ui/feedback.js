@@ -83,9 +83,8 @@ export function withUndo(msg, mutate){
   mutate();
   save(); requestRender();
   toast(msg, {undo(){
-    replaceState(migrate(JSON.parse(snap), Date.now()));
+    replaceState(migrate(JSON.parse(snap), Date.now()));   /* 差し替えの通知は replaceState が出す */
     saveNow();
-    dispatchEvent(new CustomEvent('app:state-replaced'));
     requestRender();
     toast('元に戻しました');
   }});

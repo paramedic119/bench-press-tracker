@@ -4,7 +4,9 @@
 import { PROGRAM, isMaxTest } from './program.js';
 
 /* ---------- 進捗の集計 ---------- */
-export const setsDone = (sets, id) => (sets[id]||[]).filter(Boolean).length;
+/* 集計は多くの画面から呼ばれるので、形が崩れていても 落とさない。
+   migrate を通っていれば必ず配列だが、ここが落ちると画面ごと白くなる。 */
+export const setsDone = (sets, id) => { const a = sets[id]; return Array.isArray(a) ? a.filter(Boolean).length : 0; };
 export const isSessionDone = (sets, s) => setsDone(sets, s.id) >= s.sets;
 export const isDayDone = (sets, w, d) => PROGRAM.filter(s=>s.week===w && s.day===d).every(s=>isSessionDone(sets, s));
 export function dayProgress(sets, w, d){
@@ -33,9 +35,10 @@ export function firstIncompleteDay(sets){
 /** セッションの記録日時 = セット✓とログの最新タイムスタンプ（旧データはnull） */
 export function sessionDate(state, id){
   let t = 0;
-  for(const v of (state.sets[id]||[])) if(typeof v==='number' && v>t) t = v;
+  const done = state.sets[id];
+  if(Array.isArray(done)) for(const v of done) if(typeof v === 'number' && v > t) t = v;
   const a = state.logs[id];
-  if(Array.isArray(a)) for(const x of a) if(x && x.t>t) t = x.t;
+  if(Array.isArray(a)) for(const x of a) if(x && x.t && x.t > t) t = x.t;
   return t || null;
 }
 /** タイマー秒数をセッション種別から決める */

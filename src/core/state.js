@@ -35,6 +35,51 @@ export function cleanEntry(x){
 }
 
 /**
+ * セッションid → セット記録。v1 の「セッションに1件のオブジェクト」もここで配列へ移行する。
+ * 現サイクルにも履歴にも同じものを通すので、どちらから来ても形が保証される。
+ * @returns {LogMap}
+ */
+function cleanLogs(raw){
+  /** @type {LogMap} */
+  const out = {};
+  if(!raw || typeof raw !== 'object') return out;
+  for(const k in raw){
+    if(!BY_ID.has(+k)) continue;
+    const v = raw[k];
+    const arr = (Array.isArray(v) ? v : [v]).map(cleanEntry);
+    while(arr.length && arr[arr.length-1] === null) arr.pop();
+    if(arr.length) out[k] = arr;
+  }
+  return out;
+}
+
+/**
+ * セッションid → セットごとの完了時刻。数値でなければ真偽値に落とす。
+ * @returns {SetMap}
+ */
+function cleanSets(raw){
+  /** @type {SetMap} */
+  const out = {};
+  if(!raw || typeof raw !== 'object') return out;
+  for(const k in raw){
+    if(!BY_ID.has(+k) || !Array.isArray(raw[k])) continue;
+    const arr = raw[k].map(v => (typeof v === 'number' && v > 0) ? v : !!v);
+    while(arr.length && !arr[arr.length-1]) arr.pop();
+    if(arr.length) out[k] = arr;
+  }
+  return out;
+}
+
+/** 3種目そろった MAX。欠けや異常値は fallback で埋める。 */
+function cleanMaxes(raw, fallback){
+  /** @type {Maxes} */
+  const out = {...fallback};
+  if(raw && typeof raw === 'object')
+    for(const k of ['MB', 'MN', 'ML']) out[k] = num(raw[k], 1, 999, fallback[k]);
+  return out;
+}
+
+/**
  * 任意の保存データ／読み込みJSONを、現行スキーマの健全な状態に変換する。
  * 壊れた値は既定値に落とし、v1（セッション単位ログ）からの移行も行う。
  */
@@ -43,9 +88,7 @@ export function migrate(raw, now){
   if(!raw || typeof raw!=='object') return d;
   const S = d;
 
-  if(raw.maxes && typeof raw.maxes==='object'){
-    for(const k of ['MB','MN','ML']) S.maxes[k] = num(raw.maxes[k], 1, 999, d.maxes[k]);
-  }
+  S.maxes = cleanMaxes(raw.maxes, d.maxes);
   /* 旧バージョンの 1.25kg 刻みは実際には組めないので 2.5kg に寄せる */
   S.round = +raw.round === 1.25 ? 2.5 : ROUND_OPTIONS.includes(+raw.round) ? +raw.round : d.round;
   S.bar = [20, 15, 10].includes(+raw.bar) ? +raw.bar : d.bar;
@@ -65,24 +108,8 @@ export function migrate(raw, now){
     };
   }
 
-  /* ログ: v1 は「セッションに1件のオブジェクト」→ セット配列へ */
-  if(raw.logs && typeof raw.logs==='object'){
-    for(const k in raw.logs){
-      if(!BY_ID.has(+k)) continue;
-      const v = raw.logs[k];
-      const arr = (Array.isArray(v) ? v : [v]).map(cleanEntry);
-      while(arr.length && arr[arr.length-1]===null) arr.pop();
-      if(arr.length) S.logs[k] = arr;
-    }
-  }
-  if(raw.sets && typeof raw.sets==='object'){
-    for(const k in raw.sets){
-      if(!BY_ID.has(+k) || !Array.isArray(raw.sets[k])) continue;
-      const arr = raw.sets[k].map(v => (typeof v==='number' && v>0) ? v : (v ? true : false));
-      while(arr.length && !arr[arr.length-1]) arr.pop();
-      if(arr.length) S.sets[k] = arr;
-    }
-  }
+  S.logs = cleanLogs(raw.logs);
+  S.sets = cleanSets(raw.sets);
   if(raw.notes && typeof raw.notes==='object'){
     for(const k in raw.notes){
       const mk = /^(\d{1,2})-([123])$/.exec(k);
@@ -98,14 +125,28 @@ export function migrate(raw, now){
     S.ui.day = num(raw.ui.day, 1, 3, 1) | 0;
     S.ui.ex = ['BP','NR','LG'].includes(raw.ui.ex) ? raw.ui.ex : 'BP';
   }
+  /* 履歴も現サイクルと同じ検証を通す。
+     ここを素通しにすると、壊れたバックアップを読んだだけで履歴・進捗の描画が落ちる。 */
   if(Array.isArray(raw.history)){
-    S.history = raw.history.filter(h => h && typeof h==='object' && h.maxesStart).map(h => ({
-      n: num(h.n, 1, 9999, 1)|0,
-      started: num(h.started, 0, Infinity, now), ended: num(h.ended, 0, Infinity, now),
-      maxesStart: h.maxesStart, maxesEnd: h.maxesEnd || h.maxesStart,
-      best: h.best || {}, logs: h.logs && typeof h.logs==='object' ? h.logs : {},
-      sets: h.sets && typeof h.sets==='object' ? h.sets : {},
-    }));
+    S.history = raw.history.filter(h => h && typeof h === 'object').map(h => {
+      const maxesStart = cleanMaxes(h.maxesStart, d.maxes);
+      /* 3種目とも必ず埋める。有無で形が変わると migrate が冪等でなくなり、
+         取り消し（スナップショットを migrate し直す）で状態がわずかに揺れる。 */
+      /** @type {Record<ExKey, number|null>} */
+      const best = {BP: null, NR: null, LG: null};
+      if(h.best && typeof h.best === 'object')
+        for(const ex of ['BP', 'NR', 'LG']) best[ex] = num(h.best[ex], 1, 999, null);
+      return {
+        n: num(h.n, 1, 9999, 1) | 0,
+        started: num(h.started, 0, Infinity, now),
+        ended: num(h.ended, 0, Infinity, now),
+        maxesStart,
+        maxesEnd: cleanMaxes(h.maxesEnd, maxesStart),
+        best,
+        logs: cleanLogs(h.logs),
+        sets: cleanSets(h.sets),
+      };
+    });
   }
   if(raw.cycle && typeof raw.cycle==='object'){
     S.cycle = {n: num(raw.cycle.n, 1, 9999, 1)|0, started: num(raw.cycle.started, 0, Infinity, now)};

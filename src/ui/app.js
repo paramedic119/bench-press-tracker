@@ -4,7 +4,7 @@
 import { isDayDone, firstIncompleteDay } from '../core/index.js';
 import { $, qsa, dataStr } from './dom.js';
 import { S, save, storage, showBanner, initPersistence } from './store.js';
-import { onRender, onGoto } from './events.js';
+import { onRender, onGoto, onStateReplaced } from './events.js';
 import { initTheme, applyTheme } from './theme.js';
 import { toast, haptic } from './feedback.js';
 import { initTimer } from './timer.js';
@@ -74,8 +74,8 @@ function boot(){
 
   onRender(renderAll);
   onGoto(goto);
-  /* undo や JSON 読み込みで状態が丸ごと入れ替わったら、テーマも追従させる */
-  addEventListener('app:state-replaced', applyTheme);
+  /* 取り消しや JSON 読み込みで状態が入れ替わったら、テーマも追従させる */
+  onStateReplaced(applyTheme);
   /* オンライン状態は設定画面に出しているので、変化したら描き直す */
   for(const ev of ['online', 'offline']) addEventListener(ev, () => { if(currentPage === 'settings') renderSettings(); });
 

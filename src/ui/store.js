@@ -3,6 +3,7 @@
  */
 import { migrate } from '../core/index.js';
 import { $ } from './dom.js';
+import { notifyStateReplaced } from './events.js';
 
 /** 旧バージョンと同じキー。読み込み時に migrate() が差分を吸収する。 */
 export const KEY = 'bench120.v1';
@@ -26,8 +27,15 @@ export const storage = {
 
 /** アプリ全体の状態。undo や読み込みで差し替わるので、参照ではなくこの束縛を見ること。 */
 export let S = migrate(storage.read(), Date.now());
-/** 状態をまるごと差し替える（undo / JSON読み込み） */
-export function replaceState(next){ S = next; }
+/**
+ * 状態をまるごと差し替える（取り消し / JSON読み込み）。
+ * 差し替えたことを必ず通知する。呼び出し側に任せると、
+ * 画面がキャッシュした古い値を出したまま気づけない。
+ */
+export function replaceState(next){
+  S = next;
+  notifyStateReplaced();
+}
 
 let saveTimer = null;
 /** 連打時の書き込みをまとめる */

@@ -25,7 +25,8 @@ export const PLATE_UNIT = 0.25;   /* すべてのプレートは 0.25kg の倍�
  */
 export function plateBreakdown(total, bar, plates = platesFor(1.25)){
   const sideKg = (total - bar) / 2;
-  if(sideKg < -0.001) return {light:true, used:[], rest:0};
+  /* NaN や Infinity をそのまま通すと、下の配列確保が落ちる */
+  if(!Number.isFinite(sideKg) || sideKg < -0.001) return {light:true, used:[], rest:0};
   const target = Math.max(0, Math.floor(sideKg / PLATE_UNIT + 1e-9));
   const coins = [...new Set(plates.map(p => Math.round(p / PLATE_UNIT)))].filter(c => c > 0).sort((a,b) => b-a);
   const count = new Float64Array(target + 1).fill(Infinity);

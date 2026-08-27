@@ -1,6 +1,6 @@
 {
   "name": "bench-press-tracker",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "BENCH 120 — 12週ベンチプレスプログラム（オフライン対応PWA）",
   "main": "index.js",
   "scripts": {

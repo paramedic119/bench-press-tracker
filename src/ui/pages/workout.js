@@ -7,6 +7,7 @@ import { PROGRAM, BY_ID, EX, EX_SHORT, TEST_WEEKS, FINAL_TEST_ID, MKEY, isMaxTes
          fmt, fmtKg, fmtSigned, fmtKgSigned } from '../../core/index.js';
 import { $, $inp, $ta, qsa, esc, fmtDate, dataNum, dataStr } from '../dom.js';
 import { S, save } from '../store.js';
+import { onStateReplaced } from '../events.js';
 import { haptic, unlockAudio, toast, withUndo } from '../feedback.js';
 import { ask } from '../dialog.js';
 import { autoRest, stopTimer } from '../timer.js';
@@ -236,6 +237,9 @@ function bindWorkoutHandlers(){
 
 /* --- セッションノート（体重・メモ） --- */
 let noteTimer = null, noteKey = null;
+/* 状態が差し替わったら作り直す。同じ週・日だと key が変わらず、
+   古いメモを表示したまま書き戻してしまうため。 */
+onStateReplaced(() => { noteKey = null; });
 function renderNote(){
   const key = `${S.ui.week}-${S.ui.day}`;
   if(key === noteKey && $('notecard').children.length) return;   /* 入力中に作り直さない */
