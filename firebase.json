@@ -1,20 +1,7 @@
 {
   "hosting": {
-    "public": ".",
-    "ignore": [
-      "firebase.json",
-      ".firebaserc",
-      "**/.*",
-      "**/node_modules/**",
-      "build_gas.js",
-      "gas_dist/**",
-      "test/**",
-      "tools/**",
-      "package.json",
-      "package-lock.json",
-      "*.xlsx",
-      "*.md"
-    ],
+    "public": "dist",
+    "ignore": ["**/.*"],
     "cleanUrls": true,
     "headers": [
       {

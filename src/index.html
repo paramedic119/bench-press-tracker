@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="ja" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>BENCH 120 — 12週ベンチプレスプログラム</title>
+<meta name="description" content="Excelの12週ベンチプレスプログラムをそのままアプリに。e1RM連鎖計算・プレート計算・インターバルタイマー・実績反映まで、オフラインで動くトレーニング記録アプリ。">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#0F1216" id="metaTheme">
+<meta name="format-detection" content="telephone=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="BENCH 120">
+<meta property="og:type" content="website">
+<meta property="og:title" content="BENCH 120 — 12週ベンチプレスプログラム">
+<meta property="og:description" content="e1RM連鎖計算・プレート計算・インターバルタイマー。オフラインで動くベンチプレス専用トレーニングアプリ。">
+<meta property="og:image" content="./icons/icon-512.png">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icons/favicon-32.png" sizes="32x32">
+<link rel="icon" href="./icons/icon-192.png" sizes="192x192">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+<script>
+/* CSS が当たる前に data-theme を確定させ、初回のちらつきを防ぐ。
+   バンドルより先に走る必要があるので、ここだけ素のまま置く。 */
+(function(){try{
+  var s = JSON.parse(localStorage.getItem('bench120.v1') || '{}');
+  var t = (s && s.theme) || 'auto';
+  if(t === 'auto') t = matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+  document.documentElement.dataset.theme = t;
+}catch(e){}})();
+</script>
+<!--STYLES-->
+</head>
+<body>
+
+<header id="appHeader">
+  <div class="hrow">
+    <div class="brand">
+      <h1>BENCH <span>120</span> <small>/ 12週プログラム</small></h1>
+      <div class="sub" id="headSub">読み込み中…</div>
+    </div>
+    <button class="ring" id="btnToday" type="button" aria-label="次の未完了セッションへ移動">
+      <svg viewBox="0 0 42 42" aria-hidden="true">
+        <circle class="trk" cx="21" cy="21" r="18.2"></circle>
+        <circle class="bar" cx="21" cy="21" r="18.2" stroke-dasharray="0 114.4"></circle>
+      </svg>
+      <b id="ringPct">0%</b>
+    </button>
+  </div>
+</header>
+
+<div id="banner" role="status"></div>
+
+<main>
+  <section class="page active" id="page-workout" role="tabpanel" aria-labelledby="tab-workout">
+    <div class="weekstrip" id="weekstrip" role="tablist" aria-label="週の選択"></div>
+    <div class="weeklabel" id="weeklabel"></div>
+    <div class="daytabs" id="daytabs" role="tablist" aria-label="日の選択"></div>
+    <div id="sessions"></div>
+    <div class="notecard" id="notecard"></div>
+  </section>
+
+  <section class="page" id="page-progress" role="tabpanel" aria-labelledby="tab-progress">
+    <div class="statgrid" id="statgrid"></div>
+    <div class="extabs" id="extabs" role="tablist" aria-label="種目の選択"></div>
+    <div class="chartbox">
+      <h3 id="chartTitle">推定1RMの推移</h3>
+      <svg id="chart" width="100%" height="220" viewBox="0 0 340 220" preserveAspectRatio="none" role="img" aria-label="推定1RMの推移グラフ"></svg>
+      <div class="legend">
+        <span><i style="background:var(--accent)"></i>計画 e1RM</span>
+        <span><i style="background:var(--actual)"></i>実績 e1RM</span>
+        <span><i style="background:var(--muted);border-radius:50%"></i>MAXテスト</span>
+      </div>
+    </div>
+    <div class="chartbox" id="rmBox">
+      <h3 id="rmTitle">レップマックスの推移</h3>
+      <div class="empty" id="rmEmpty" hidden></div>
+      <svg id="rmChart" width="100%" height="200" viewBox="0 0 340 200" preserveAspectRatio="none" role="img" aria-label="3RM・5RM・8RMの推移グラフ"></svg>
+      <div class="legend" id="rmLegend">
+        <span><i style="background:var(--accent)"></i>3RM</span>
+        <span><i style="background:var(--actual)"></i>5RM</span>
+        <span><i style="background:var(--ok)"></i>8RM</span>
+        <span id="rmCycleKey" hidden><i style="background:var(--muted);height:2px;width:12px;border-radius:0"></i>サイクルの区切り</span>
+      </div>
+      <div class="rmrow" id="rmRow"></div>
+      <div class="chartnote" id="rmNote"></div>
+    </div>
+
+    <div class="chartbox">
+      <h3>週間ボリューム — 全種目・計画値</h3>
+      <svg id="volChart" width="100%" height="170" viewBox="0 0 340 170" preserveAspectRatio="none" role="img" aria-label="週間ボリュームのグラフ"></svg>
+      <div class="legend">
+        <span><i style="background:var(--surface-3)"></i>総ボリューム</span>
+        <span><i style="background:var(--accent)"></i>補正ボリューム</span>
+      </div>
+      <div class="chartnote">補正ボリューム = 重量×回数×セット数×(RPE/10)²×(重量/e1RM)²（ExcelのI・J列）。テスト週(4/8/12)で疲労が抜ける波形が見えます。</div>
+    </div>
+    <div class="chartbox" id="cycleBox" hidden>
+      <h3 id="cycleTitle">サイクルごとのMAX推移</h3>
+      <svg id="cycleChart" width="100%" height="170" viewBox="0 0 340 170" preserveAspectRatio="none" role="img" aria-label="サイクルごとのMAX推移グラフ"></svg>
+      <div class="legend">
+        <span><i style="background:var(--accent)"></i>サイクル開始MAX</span>
+        <span><i style="background:var(--actual)"></i>今サイクルのベストe1RM</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="page" id="page-history" role="tabpanel" aria-labelledby="tab-history">
+    <div class="statgrid" id="histStats"></div>
+    <div class="chartbox">
+      <h3>トレーニングカレンダー — 直近18週</h3>
+      <div class="heat" id="heat"></div>
+      <div class="heatax" id="heatax"></div>
+      <div class="legend">
+        <span><i style="background:var(--ok)"></i>1〜2セッション</span>
+        <span><i style="background:var(--accent)"></i>3セッション以上</span>
+      </div>
+    </div>
+    <div class="sechead">記録したセッション</div>
+    <div class="hist" id="histList"></div>
+    <div class="sechead" id="cycHead" hidden>過去のサイクル</div>
+    <div id="cycList"></div>
+  </section>
+
+  <section class="page" id="page-settings" role="tabpanel" aria-labelledby="tab-settings">
+    <div class="sgroup">
+      <h3>現在のMAX (kg)<small>Excelの入力セルと同じ。変更すると全12週の重量が再計算されます。</small></h3>
+      <div id="maxRows"></div>
+    </div>
+
+    <div class="sgroup">
+      <h3>インターバルタイマー<small>セットに ✓ を付けると自動でカウントダウンを開始します。</small></h3>
+      <div class="switchrow">
+        <p>セット完了で<b>自動スタート</b></p>
+        <button class="sw" id="restSw" role="switch" aria-label="インターバルタイマーの自動スタート"></button>
+      </div>
+      <div id="restRows"></div>
+      <div class="switchrow" style="margin-top:8px">
+        <p>終了時に<b>音</b>で知らせる</p>
+        <button class="sw" id="soundSw" role="switch" aria-label="タイマー終了音"></button>
+      </div>
+      <div class="switchrow">
+        <p>終了時に<b>バイブレーション</b>（対応端末のみ）</p>
+        <button class="sw" id="vibeSw" role="switch" aria-label="タイマー終了時のバイブレーション"></button>
+      </div>
+    </div>
+
+    <div class="sgroup">
+      <h3>ウォームアップ<small>メインセットの重量から、バー→ 45/62/78/90% のアップを自動で提案します。</small></h3>
+      <div class="switchrow">
+        <p>カードに<b>アップセットを表示</b></p>
+        <button class="sw" id="warmSw" role="switch" aria-label="ウォームアップ表示"></button>
+      </div>
+    </div>
+
+    <div class="sgroup">
+      <h3>重量の丸め<small>表示・プレート計算のみ丸めます。e1RMの連鎖計算は生値（Excel互換）。細かい刻みを選ぶと、最小プレートも自動で合わせます。</small></h3>
+      <div class="optrow" id="roundOpts"></div>
+    </div>
+
+    <div class="sgroup">
+      <h3>バー重量</h3>
+      <div class="optrow" id="barOpts"></div>
+    </div>
+
+    <div class="sgroup">
+      <h3>最小プレート（片側）<small>持っている一番小さいプレート。プレート計算の刻みになります。</small></h3>
+      <div class="optrow" id="microOpts"></div>
+    </div>
+
+    <div class="sgroup">
+      <h3>実績反映モード</h3>
+      <div class="switchrow">
+        <p>ONにすると、記録したセットのうち<b>ベストのe1RM</b>を使って以降のセッション重量を再計算します。セット記録中は次セットの推奨重量も毎セット更新されます。</p>
+        <button class="sw" id="adaptiveSw" role="switch" aria-label="実績反映モード"></button>
+      </div>
+    </div>
+
+    <div class="sgroup">
+      <h3>外観</h3>
+      <div class="optrow" id="themeOpts"></div>
+    </div>
+
+    <div class="sgroup">
+      <h3>サイクル<small id="cycleInfo"></small></h3>
+      <button class="ghostbtn" id="btnNextCycle" type="button">サイクルを完了して次のサイクルを開始</button>
+      <p style="font-size:.68rem;color:var(--muted);line-height:1.7">今の記録を履歴にアーカイブし、サイクル中ベストのe1RMを新しいMAXにしてWeek 1から再開します。Week 12の最終テストを記録するとワークアウト画面にも開始ボタンが出ます。</p>
+    </div>
+
+    <div class="sgroup">
+      <h3>データ<small id="dataInfo"></small></h3>
+      <button class="ghostbtn" id="btnExport" type="button">JSONを書き出す（バックアップ）</button>
+      <button class="ghostbtn" id="btnCsv" type="button">CSVを書き出す（記録一覧）</button>
+      <button class="ghostbtn" id="btnImport" type="button">JSONを読み込む</button>
+      <input type="file" id="importFile" accept="application/json,.json" hidden>
+      <button class="danger" id="btnReset" type="button">記録をすべてリセット</button>
+    </div>
+
+    <div class="sgroup">
+      <h3>アプリ<small id="appInfo"></small></h3>
+      <button class="ghostbtn" id="btnUpdate" type="button">更新を確認</button>
+      <button class="ghostbtn" id="btnTour" type="button">初期設定をやり直す</button>
+    </div>
+
+    <p class="foot">
+      e1RM = <code>重量 × (回数 + 10 − RPE) / 33 + 重量</code><br>
+      ※ RPE10シングルは e1RM = 重量<br>
+      <span id="verLine"></span>
+    </p>
+  </section>
+</main>
+
+<div id="restbar" role="timer" aria-live="off">
+  <div class="tdial">
+    <svg viewBox="0 0 38 38" aria-hidden="true">
+      <circle class="trk" cx="19" cy="19" r="16.4"></circle>
+      <circle class="bar" cx="19" cy="19" r="16.4" stroke-dasharray="103 103"></circle>
+    </svg>
+  </div>
+  <div class="tinfo">
+    <div class="ttime num" id="tTime">0:00</div>
+    <div class="tlab" id="tLab">インターバル</div>
+  </div>
+  <button class="tbtn" id="tMinus" type="button" aria-label="30秒減らす">−30</button>
+  <button class="tbtn" id="tPlus" type="button" aria-label="30秒増やす">+30</button>
+  <button class="tbtn x" id="tStop" type="button" aria-label="タイマーを終了">✕</button>
+</div>
+
+<nav role="tablist" aria-label="メインナビゲーション">
+  <button data-page="workout" id="tab-workout" class="sel" role="tab" aria-selected="true"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 6.5v11M3.5 9v5M17.5 6.5v11M20.5 9v5M6.5 12h11"/></svg></span>ワークアウト</button>
+  <button data-page="progress" id="tab-progress" role="tab" aria-selected="false"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4v16h16"/><path d="M7.5 13.5l3.5-3.5 3 2.5 5-6"/></svg></span>進捗</button>
+  <button data-page="history" id="tab-history" role="tab" aria-selected="false"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="16" rx="2.5"/><path d="M3.5 9.5h17M8 3v3M16 3v3M7.5 13h3M13.5 13h3M7.5 16.8h3"/></svg></span>履歴</button>
+  <button data-page="settings" id="tab-settings" role="tab" aria-selected="false"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>設定</button>
+</nav>
+
+<div id="toast" role="status" aria-live="polite"><span class="tmsg"></span></div>
+<div id="scrim" role="dialog" aria-modal="true" aria-labelledby="sheetTitle"></div>
+<div id="onboard" aria-label="初期設定"></div>
+
+<!--SCRIPT-->
+</body>
+</html>

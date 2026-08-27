@@ -1,19 +1,10 @@
 /**
- * index.html の /*<core>*​/ 〜 /*</core>*​/ ブロックを抜き出して検証する。
- * アプリを単一ファイルのまま保ちつつ、計算ロジックにはテストを効かせる。
+ * コアロジックのユニットテスト。
  *   実行: npm test
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const html = readFileSync(join(ROOT, 'index.html'), 'utf8');
-const m = html.match(/\/\*<core>\*\/([\s\S]*?)\/\*<\/core>\*\//);
-assert.ok(m, 'index.html に core ブロックが見つかりません');
-// 同一レルムで評価する（別レルムだと deepEqual が prototype 差で落ちる）
-const C = new Function(`'use strict';${m[1]};return CORE;`)();
+import * as C from '../src/core/index.js';
 
 const NOW = Date.UTC(2026, 0, 15, 9, 0, 0);
 

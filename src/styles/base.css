@@ -1,0 +1,24 @@
+/* リセットと基本のタイポグラフィ。 */
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{font-size:16px;-webkit-text-size-adjust:100%}
+body{
+  background:var(--bg);color:var(--text);
+  font-family:var(--font-body);
+  font-feature-settings:'palt' 1;
+  min-height:100svh;padding-bottom:var(--pad-b);
+  overscroll-behavior-y:none;
+  transition:background-color .25s var(--ease),color .25s var(--ease);
+}
+.num{font-family:var(--font-num);letter-spacing:.03em;font-weight:400}
+button{font:inherit;color:inherit;cursor:pointer;background:none;border:none;touch-action:manipulation}
+input,textarea{font:inherit;color:inherit}
+input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+input[type=number]{-moz-appearance:textfield;appearance:textfield}
+:focus{outline:none}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+svg{display:block}
+::selection{background:var(--accent);color:var(--on-accent)}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;
+    transition-duration:.001ms!important;scroll-behavior:auto!important}
+}

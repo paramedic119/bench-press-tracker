@@ -135,12 +135,13 @@ function drawIcon(size, { maskable = false } = {}) {
   return encodePNG(px, out);
 }
 
-mkdirSync(join(ROOT, 'icons'), { recursive: true });
+const OUT = process.env.ICON_OUT || 'dist/icons';
+mkdirSync(join(ROOT, OUT), { recursive: true });
 const files = [
-  ['icons/icon-192.png', drawIcon(192)],
-  ['icons/icon-512.png', drawIcon(512)],
-  ['icons/maskable-512.png', drawIcon(512, { maskable: true })],
-  ['icons/apple-touch-icon.png', drawIcon(180, { maskable: true })],
-  ['icons/favicon-32.png', drawIcon(32)],
+  [`${OUT}/icon-192.png`, drawIcon(192)],
+  [`${OUT}/icon-512.png`, drawIcon(512)],
+  [`${OUT}/maskable-512.png`, drawIcon(512, { maskable: true })],
+  [`${OUT}/apple-touch-icon.png`, drawIcon(180, { maskable: true })],
+  [`${OUT}/favicon-32.png`, drawIcon(32)],
 ];
 for (const [p, buf] of files) { writeFileSync(join(ROOT, p), buf); console.log(`${p}  ${(buf.length / 1024).toFixed(1)} KB`); }

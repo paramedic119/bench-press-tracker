@@ -1,0 +1,63 @@
+/* 進捗と履歴（統計カード・グラフ・ヒートマップ・一覧）。 */
+.statgrid{display:flex;gap:10px;margin:6px 0 14px}
+.stat{flex:1;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-l);padding:12px 11px}
+.stat .lbl{font-size:.63rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stat .val{font-size:1.6rem;line-height:1.15;margin-top:3px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.stat .val small{font-size:.8rem;color:var(--muted)}
+.stat .delta{font-size:.66rem;color:var(--ok);margin-top:2px;white-space:nowrap}
+.stat .delta.flat{color:var(--muted)}
+.stat .delta.warn{color:var(--warn)}
+.extabs{display:flex;gap:8px;margin-bottom:12px}
+.chartbox{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-l);padding:13px 12px 11px;margin-bottom:12px}
+.chartbox h3{font-size:.75rem;color:var(--text-dim);font-weight:500;margin-bottom:8px;line-height:1.4}
+.legend{display:flex;gap:14px;font-size:.66rem;color:var(--muted);margin-top:9px;flex-wrap:wrap}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.chartnote{font-size:.62rem;color:var(--muted);margin-top:8px;line-height:1.6}
+[hidden]{display:none!important}
+/* レップマックスの現在値 */
+.rmrow{display:flex;gap:8px;margin-top:10px}
+.rmcell{flex:1;min-width:0;background:var(--bg);border:1px solid var(--line-soft);
+  border-radius:var(--r-m);padding:9px 6px;text-align:center}
+.rmcell .k{font-size:.6rem;color:var(--muted);letter-spacing:.06em}
+.rmcell .v{font-family:var(--font-num);font-size:1.4rem;line-height:1.1;margin-top:2px;
+  font-variant-numeric:tabular-nums}
+.rmcell .v small{font-size:.62rem;color:var(--muted);letter-spacing:0}
+.rmcell .d{font-size:.6rem;margin-top:2px;color:var(--ok)}
+.rmcell .d.flat{color:var(--muted)}
+.rmcell .d.dn{color:var(--danger)}
+.rmcell.none .v{color:var(--muted);font-size:1.1rem}
+.empty{text-align:center;color:var(--muted);font-size:.78rem;line-height:1.8;padding:26px 12px}
+.empty .big{display:block;font-size:1.6rem;margin-bottom:6px;opacity:.5}
+
+/* ヒートマップ */
+.heat{display:flex;gap:3px;overflow-x:auto;padding:2px 0 6px;scrollbar-width:none}
+.heat::-webkit-scrollbar{display:none}
+.heat .hcol{display:flex;flex-direction:column;gap:3px;flex:0 0 auto}
+.heat .hc{width:13px;height:13px;border-radius:3px;background:var(--surface-2)}
+.heat .hc.on{background:var(--ok)}
+.heat .hc.on.n2{background:var(--accent)}
+.heat .hc.today{box-shadow:0 0 0 1.5px var(--text)}
+.heat .hc.future{opacity:.35}
+.heatax{display:flex;justify-content:space-between;font-size:.6rem;color:var(--muted);margin-top:2px}
+
+/* 履歴リスト */
+.hist{display:flex;flex-direction:column;gap:8px}
+.hitem{display:flex;align-items:center;gap:11px;background:var(--surface);border:1px solid var(--line);
+  border-radius:var(--r-m);padding:10px 12px}
+.hitem .hdate{flex:0 0 42px;text-align:center}
+.hitem .hdate .d{font-family:var(--font-num);font-size:1.15rem;line-height:1}
+.hitem .hdate .m{font-size:.58rem;color:var(--muted)}
+.hitem .hbody{flex:1;min-width:0}
+.hitem .htitle{font-size:.82rem;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hitem .hsub{font-size:.66rem;color:var(--muted);margin-top:2px}
+.hitem .hval{text-align:right;flex:0 0 auto}
+.hitem .hval .v{font-family:var(--font-num);font-size:1.15rem;color:var(--actual);line-height:1}
+.hitem .hval .k{font-size:.58rem;color:var(--muted)}
+.cyccard{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-l);padding:12px 14px;margin-bottom:10px}
+.cyccard .ct{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
+.cyccard .ct b{font-size:.86rem}
+.cyccard .ct span{font-size:.64rem;color:var(--muted)}
+.cyccard .cl{display:flex;justify-content:space-between;font-size:.74rem;padding:4px 0;border-top:1px solid var(--line-soft)}
+.cyccard .cl span{color:var(--muted)}
+.cyccard .cl b{font-family:var(--font-num);font-size:.95rem;font-weight:400}
+.cyccard .cl .up{color:var(--ok)}.cyccard .cl .dn{color:var(--danger)}

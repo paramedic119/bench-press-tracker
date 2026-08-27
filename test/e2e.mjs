@@ -1,29 +1,9 @@
-/**
- * ブラウザ実機での動作確認（npm run e2e）
- *   前提: npx playwright install chromium
- *   静的サーバーは自前で立てるので、事前準備は不要。
- * ユニットテスト（npm test）とは別枠。CIでは走らせていない。
- */
 import { chromium } from 'playwright';
-import { createServer } from 'node:http';
+import { createStaticServer } from '../tools/serve.mjs';
 import { readFile } from 'node:fs/promises';
-import { extname, join, normalize } from 'node:path';
-import { dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const MIME = {'.html':'text/html', '.js':'text/javascript', '.json':'application/json',
-  '.webmanifest':'application/manifest+json', '.png':'image/png', '.css':'text/css'};
-
-const server = createServer(async (req, res) => {
-  const p = decodeURIComponent(req.url.split('?')[0]);
-  const file = join(ROOT, normalize(p === '/' ? '/index.html' : p).replace(/^(\.\.[/\\])+/, ''));
-  try{
-    const buf = await readFile(file);
-    res.writeHead(200, {'Content-Type': MIME[extname(file)] || 'application/octet-stream'});
-    res.end(buf);
-  }catch{ res.writeHead(404).end('not found'); }
-});
+const server = createStaticServer();
 await new Promise(r => server.listen(0, '127.0.0.1', r));
 const BASE = `http://127.0.0.1:${server.address().port}`;
 
@@ -123,6 +103,7 @@ const watch = page => {
   ok('記録するとレップマックスが描画される',
      (await p.locator('#rmEmpty').isHidden()) && await p.locator('#rmRow .rmcell').count() === 3,
      (await p.locator('#rmRow').textContent()).replace(/\s+/g, ' ').trim());
+  await p.locator('nav [data-page="settings"]').click(); await p.waitForTimeout(300);
   await p.locator('#themeOpts .opt', {hasText:'ライト'}).click(); await p.waitForTimeout(250);
   ok('ライトテーマに切り替わる', await p.evaluate(() => document.documentElement.dataset.theme) === 'light'
     && await p.locator('#metaTheme').getAttribute('content') === '#F4F5F3');
@@ -166,6 +147,57 @@ const watch = page => {
   ok('オフラインでも記録できる', await p.locator('.card').first().locator('.setbtn').first().evaluate(e => e.classList.contains('on')));
   await ctx.setOffline(false);
   await ctx.close();
+}
+
+/* ---------- 5. アクセシビリティ（axe-core） ---------- */
+{
+  const axeSource = await readFile(createRequire(import.meta.url).resolve('axe-core/axe.min.js'), 'utf8');
+  const ctx = await newCtx(SEED);
+  const p = await ctx.newPage(); watch(p);
+  await p.goto(BASE, {waitUntil:'domcontentloaded'}); await p.waitForTimeout(400);
+  await p.addScriptTag({content: axeSource});
+  for(const tab of ['workout', 'progress', 'history', 'settings']){
+    await p.locator(`nav [data-page="${tab}"]`).click(); await p.waitForTimeout(300);
+    const violations = await p.evaluate(async () => {
+      // @ts-ignore axe はページに注入している
+      const r = await axe.run(document, {resultTypes: ['violations'],
+        runOnly: {type: 'tag', values: ['wcag2a', 'wcag2aa']}});
+      return r.violations
+        .filter(v => v.impact === 'critical' || v.impact === 'serious')
+        .map(v => `${v.id}(${v.nodes.length})`);
+    });
+    ok(`${tab}: 重大なa11y違反なし`, violations.length === 0, violations.join(', '));
+  }
+  await ctx.close();
+}
+
+/* ---------- 6. レイアウト（狭い端末・両テーマ） ---------- */
+for(const theme of ['dark', 'light']){
+  for(const width of [320, 390, 430]){
+    const ctx = await newCtx({...SEED, theme}, {viewport: {width, height: 780}});
+    const p = await ctx.newPage(); watch(p);
+    await p.goto(BASE, {waitUntil: 'domcontentloaded'}); await p.waitForTimeout(350);
+    await p.locator('.card').first().locator('.logtoggle').click(); await p.waitForTimeout(150);
+    const problems = [];
+    for(const tab of ['workout', 'progress', 'history', 'settings']){
+      await p.locator(`nav [data-page="${tab}"]`).click(); await p.waitForTimeout(250);
+      const r = await p.evaluate(() => {
+        const doc = document.documentElement;
+        const tiny = [];
+        for(const el of document.querySelectorAll('button,[role=switch],input,textarea,summary')){
+          const b = el.getBoundingClientRect();
+          /* 記録行の − / ＋ は幅を詰めているので、高さだけ見る */
+          if(b.width === 0) continue;
+          if(b.height < 32) tiny.push(el.className || el.tagName);
+        }
+        return {overflow: doc.scrollWidth - doc.clientWidth, tiny: [...new Set(tiny)]};
+      });
+      if(r.overflow > 0) problems.push(`${tab}:横はみ出し${r.overflow}px`);
+      if(r.tiny.length) problems.push(`${tab}:低いタップ領域 ${r.tiny.join(',')}`);
+    }
+    ok(`${theme} / ${width}px でレイアウト崩れなし`, problems.length === 0, problems.join(' '));
+    await ctx.close();
+  }
 }
 
 await browser.close();

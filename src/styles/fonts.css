@@ -1,0 +1,10 @@
+/* 見出しと数字に使う Bebas Neue。ビルド時に woff2 を data URI として埋め込むので、
+   第三者へのリクエストは発生せず、初回オフラインでも同じ見た目になる。
+   日本語はシステムフォント（Hiragino / Noto Sans CJK / Yu Gothic UI）に任せる。 */
+@font-face{
+  font-family:'Bebas Neue';
+  font-style:normal;
+  font-weight:400;
+  font-display:swap;
+  src:url(__BEBAS_WOFF2__) format('woff2');
+}
